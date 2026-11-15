@@ -2,12 +2,11 @@
   <img src="assets/clipper-banner.jpg" alt="Clipper: a kingfisher in a scarf reading the news, with articles, likes and charts flying around it" width="100%">
 </p>
 
-<h3 align="center">Media monitoring for small teams, run by Claude.</h3>
+<h3 align="center">Media monitoring for small teams.</h3>
 
 <p align="center">
-  Every week, Clipper finds what the news and social media said about you, in any country.<br>
-  Claude reads it all and writes a short Word report you can send straight on.<br>
-  Setup takes ten clicks.
+  Clipper finds what the news and social media are saying about your organisation, in any country,<br>
+  and turns it into a short report you can share.
 </p>
 
 <p align="center">
@@ -29,7 +28,7 @@
 
 <p align="center">
   <b>Free and open source (MIT).</b> No Clipper account, no subscription, no Clipper server in the middle.<br>
-  Everything runs on your computer, inside your own Claude.
+  Everything runs on your computer.
 </p>
 
 ---
