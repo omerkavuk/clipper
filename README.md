@@ -2,11 +2,12 @@
   <img src="assets/clipper-banner.jpg" alt="Clipper: a kingfisher in a scarf reading the news, with articles, likes and charts flying around it" width="100%">
 </p>
 
-<h3 align="center">Know what the press said about you this week. Send the report on in one click.</h3>
+<h3 align="center">Media monitoring for small teams, run by Claude.</h3>
 
 <p align="center">
-  Clipper watches your organisation in any country's news and social media, has Claude read every article,<br>
-  and hands you a Word report grouped by topic, with the figures first. Set it up once, by answering ten questions.
+  Every week, Clipper finds what the news and social media said about you, in any country.<br>
+  Claude reads it all and writes a short Word report you can send straight on.<br>
+  Setup takes ten clicks.
 </p>
 
 <p align="center">
