@@ -165,7 +165,7 @@ def test_sections_in_order_and_old_sections_gone(tmp_path, store, p):
     run, ids = make_run(store, [mk(1)], [tag(related="Green Schools")])
     render_report(store, run, draft_with(tmp_path, "## Summary\n\nA good month. Mostly awards."), p, tmp_path)
     md = report_md(tmp_path, p)
-    assert md.index("## At a glance") < md.index("## Summary") < md.index("## By programme")
+    assert md.index("## At a glance") < md.index("## Summary") < md.index("## By topic")
     for gone in ("Key items", "Things to notice", "By theme"):
         assert gone not in md
     assert "\nA good month. Mostly awards.\n" in md
@@ -294,7 +294,7 @@ def test_empty_summary_is_left_out(tmp_path, store, p):
     run, ids = make_run(store, [mk(1)])
     stats = render_report(store, run, draft_with(tmp_path, "The agent searched the feeds."), p, tmp_path)
     md = report_md(tmp_path, p)
-    assert "## Summary" not in md and "## By programme" in md and stats["fallback"] is True
+    assert "## Summary" not in md and "## By topic" in md and stats["fallback"] is True
     note = render_run_note(store, run, p, stats, tmp_path).read_text("utf-8")
     assert "Draft unusable" in note
 

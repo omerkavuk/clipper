@@ -102,7 +102,7 @@ Options: **Weekly, on Monday morning** (default) · **Daily** · **Monthly**.
 > **Who will read the report?**
 > → This sets how long the summary is. Reports are in English for now.
 
-Options: **Just me** · **My team** · **Senior management** · **Partners or donors**.
+Options: **Just me** · **My team** · **Management** · **Clients or partners**.
 
 ---
 

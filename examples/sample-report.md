@@ -16,7 +16,7 @@ Aurora Climate Lab · 16 Oct 2026 – 15 Nov 2026 · Scope: online media in Ital
 
 Green Schools drove this month's coverage, from new schools joining in the north to the teaching kit reaching 120 classrooms. Solar Villages drew positive trade and foreign coverage, but mayors are asking for faster timelines. Clean Air Week had no coverage this period.
 
-## By programme
+## By topic
 
 ### Green Schools (6 articles)
 

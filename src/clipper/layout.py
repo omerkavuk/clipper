@@ -267,7 +267,7 @@ def build(d: ReportData, guard=lambda s: s) -> list[Block]:
         blocks += [Block("h2", [Run("Summary")]), Block("para", [Run(d.summary)])]
 
     shown = set(i.id for i in sorted(relevant, key=lambda i: _rank_key(i, d.tags, tiers))[:d.max_items])
-    blocks.append(Block("h2", [Run("By programme")]))
+    blocks.append(Block("h2", [Run("By topic")]))
     order = sorted(groups, key=lambda g: (len(members[g[0]]) == 0, -len(members[g[0]])))
     for heading, _ in order:
         items = members[heading]

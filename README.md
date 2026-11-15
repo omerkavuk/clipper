@@ -2,11 +2,11 @@
   <img src="assets/clipper-banner.jpg" alt="Clipper: a kingfisher in a scarf reading the news, with articles, likes and charts flying around it" width="100%">
 </p>
 
-<h3 align="center">Know what the press said about you this week. Forward it to leadership in one click.</h3>
+<h3 align="center">Know what the press said about you this week. Send the report on in one click.</h3>
 
 <p align="center">
   Clipper watches your organisation in any country's news and social media, has Claude read every article,<br>
-  and hands you a Word report grouped by programme, with the figures first. Set it up once, by answering ten questions.
+  and hands you a Word report grouped by topic, with the figures first. Set it up once, by answering ten questions.
 </p>
 
 <p align="center">
@@ -59,18 +59,18 @@
 
 ## Why Clipper
 
-It's Monday morning and your director wants to know how last week's launch landed in the press. You open Google News, type the organisation's name, then its Italian name, then the acronym, then the programme. You paste fifteen links into a document. Half of them are the same press release reprinted by six sites. Two are job adverts. One is about a different organisation with a similar name. You write three lines on top, and by the time it's sent it's Tuesday.
+It's Monday morning and your manager wants to know how last week's launch landed in the press. You open Google News, type the organisation's name, then its Italian name, then the acronym, then the product name. You paste fifteen links into a document. Half of them are the same press release reprinted by six sites. Two are job adverts. One is about a different organisation with a similar name. You write three lines on top, and by the time it's sent it's Tuesday.
 
-The tools that do this properly, the media monitoring suites big organisations use, cost thousands a year on an annual contract. Google Alerts is free, but it sends you a list of links, misses most local outlets and can't tell you whether an article is positive, which programme it's about, or whether it even names you.
+The tools that do this properly, the media monitoring suites big organisations use, cost thousands a year on an annual contract. Google Alerts is free, but it sends you a list of links, misses most local outlets and can't tell you whether an article is positive, which topic it's about, or whether it even names you.
 
 **Clipper sits in between.** It does what a junior press officer does every week, the same way every time:
 
 - **It knows where to look.** In setup, Clipper builds a source list for your country (national papers, regional papers, agencies, TV and radio, think tanks, ministries), checks that every site answers and finds its news feed. Then it searches Google News, Bing News and GDELT on top, and social media if you want it.
-- **It reads everything.** Claude reads each article and decides whether it's really about you or just a passing mention. It notes the tone with a one-line reason, which programme it's about, whether you're named directly or only your parent body, and what kind of piece it is.
-- **It writes the report leadership actually reads.** Figures first, a three-sentence summary, then every article grouped by programme, with the outlet name on top. Programmes with no coverage stay in the report, because leadership wants to see the gaps too.
+- **It reads everything.** Claude reads each article and decides whether it's really about you or just a passing mention. It notes the tone with a one-line reason, which topic it's about, whether you're named directly or only your parent body, and what kind of piece it is.
+- **It writes a report people actually read.** Figures first, a three-sentence summary, then every article grouped by topic, with the outlet name on top. Topics with no coverage stay in the report, because the gaps matter too.
 - **It tells you what it missed.** A private run note lists the outlets that didn't answer and the searches that failed. The report itself never mentions any of this, so you can forward it untouched.
 
-Clipper was built for small communications teams: UN country offices, NGOs, research centres, foundations, start-ups. That means anyone with a press presence and no monitoring budget. It's not tied to one country: you give it a country and the languages its press writes in, and it starts from there.
+Clipper was built for small communications teams: start-ups, small companies, agencies, non-profits, research groups. That means anyone with a press presence and no monitoring budget. It's not tied to one country: you give it a country and the languages its press writes in, and it starts from there.
 
 ---
 
@@ -81,9 +81,9 @@ Clipper was built for small communications teams: UN country offices, NGOs, rese
 | **Price** | Free; uses your Claude plan | Annual contract, typically thousands a year | Free | Free, costs hours |
 | **Setup** | Ten clickable questions | Onboarding with a sales team | Type a keyword | None |
 | **Local outlets** | A checked source list for your country, built in setup | Large paid databases | What Google happens to index | What you remember to check |
-| **Reads the articles** | Yes: relevance, tone, programme, how you're named | Usually, with automated sentiment | No | Yes, slowly |
+| **Reads the articles** | Yes: relevance, tone, topic, how you're named | Usually, with automated sentiment | No | Yes, slowly |
 | **Duplicates and reprints** | Merged, and the same story is grouped across outlets | Usually | No | By hand |
-| **Report for leadership** | A Word file, ready to forward | Dashboards and exports | An email of links | You write it |
+| **Ready-to-send report** | A Word file, ready to forward | Dashboards and exports | An email of links | You write it |
 | **Social media** | YouTube, Reddit, LinkedIn; X, Instagram, Facebook after one login | Broad, paid | No | By hand |
 | **Your data** | Stays on your computer | On the vendor's servers | Google account | Your files |
 
@@ -157,7 +157,7 @@ On a first install, antivirus software sometimes scans the new Python environmen
 ## Your first report in fifteen minutes
 
 1. **Say "set up Clipper".** A welcome screen lists what Clipper can watch. Click **Start setup**.
-2. **Answer the questions** by clicking: organisation, country, languages, names to search, programmes and people, what to leave out, kinds of sources, social media, how often, who reads it. That takes about five minutes.
+2. **Answer the questions** by clicking: organisation, country, languages, names to search, topics and people, what to leave out, kinds of sources, social media, how often, who reads it. That takes about five minutes.
 3. **Approve your source list.** Clipper shows something like "110 sources for Italy: 26 national, 23 regional, 11 agencies…" with a few well-known names. Add or remove sources, or click **Looks good**.
 4. **Look at the test.** Clipper runs every search on last week's news and shows how many articles each one found. A search that finds nothing, or finds far too much, gets a plain-words warning and a fix.
 5. **Approve the cost.** For example: "Each weekly report uses about 40,000 tokens." Nothing runs until you click **Approve**.
@@ -180,12 +180,12 @@ Each screen asks one question, offers clickable answers and says in one line wha
 | 2 | **Country** | Clipper will build that country's source list at the end |
 | 3 | **Languages** | Searches run in every language you tick |
 | 4 | **Names to search** | Only the names the press really uses. Parent bodies (the foundation behind a lab, say) are noted for sorting, not searched on their own. |
-| 5 | **Programmes, events and people** | Often find more coverage than the organisation's name. Everyday words and short acronyms only count next to your name. |
+| 5 | **Topics and people** (products, campaigns, events, programmes) | Often find more coverage than the organisation's name. Everyday words and short acronyms only count next to your name. |
 | 6 | **Leave out** | Your own websites and social accounts, job adverts, other meanings of your name |
 | 7 | **Types of sources** | National, regional, agencies, TV and radio, trade and specialist press, think tanks, government and institutions |
 | 8 | **Social media** | LinkedIn, YouTube, Reddit, X, Instagram, Facebook |
 | 9 | **How often** | Weekly (Monday morning), daily or monthly; each report covers everything since the last one |
-| 10 | **Who reads it** | Just you, your team, senior management, partners or donors |
+| 10 | **Who reads it** | Just you, your team, management, clients or partners |
 | 10b | **Social login** | Only for X, Instagram or Facebook: one login in a private browser |
 | 11 | **Your source list** | Researched, checked and shown for approval |
 | 12 | **Test on last week** | Every search tried on the last seven days, with warnings and fixes |
@@ -213,17 +213,17 @@ This is a real Clipper report, rendered by Clipper's own code, for **Aurora Clim
 | Part | What's in it | Who writes it |
 |---|---|---|
 | **Header** | Organisation · period · scope ("online media in Italy, LinkedIn, YouTube") | Clipper |
-| **At a glance** | Articles and outlets · tone (positive, neutral, negative) · the main programme's share · how often you're named directly, and how often only your parent body · the highest-profile outlet · news versus institutional sources · reach abroad · change since the last report | Clipper, counted from the tags. Claude never types a number. |
-| **Summary** | Two or three sentences: what drove coverage, and anything leadership should know | Claude |
-| **By programme** | One heading per programme with its article count. Under it, the **outlet name in bold**, then one line per article: a one-sentence English description, the original headline as a link, and the date. | Clipper lays it out; Claude writes the descriptions. |
+| **At a glance** | Articles and outlets · tone (positive, neutral, negative) · the main topic's share · how often you're named directly, and how often only your parent body · the highest-profile outlet · news versus institutional sources · reach abroad · change since the last report | Clipper, counted from the tags. Claude never types a number. |
+| **Summary** | Two or three sentences: what drove coverage, and anything your readers should know | Claude |
+| **By topic** | One heading per topic with its article count. Under it, the **outlet name in bold**, then one line per article: a one-sentence English description, the original headline as a link, and the date. | Clipper lays it out; Claude writes the descriptions. |
 
 A few details that matter to readers:
 
-- **Gaps stay visible.** A programme with no articles keeps its heading and says "No coverage this period."
+- **Gaps stay visible.** A topic with no articles keeps its heading and says "No coverage this period."
 - **Reprints are grouped.** When the same story runs in several outlets, they share one heading ("Notizie Verdi and Radio Valle"). Several articles from one outlet sit under a single outlet name.
 - **Links go to the publisher**, not to an aggregator's redirect page.
-- **Programmes can share a heading.** For example, "Solar Villages and Clean Air Week", set with `report_groups`. You can also rename the heading for coverage outside the programmes, for example "Other coverage of Aurora Climate Lab".
-- **Long months stay short.** Past 40 articles (you can change this), each programme lists the most important articles and adds a line like "Plus 12 more articles".
+- **Topics can share a heading.** For example, "Solar Villages and Clean Air Week", set with `report_groups`. You can also rename the heading for coverage outside your topics, for example "Other coverage of Aurora Climate Lab".
+- **Long months stay short.** Past 40 articles (you can change this), each topic lists the most important articles and adds a line like "Plus 12 more articles".
 
 The Markdown copy of that report is in [`examples/sample-report.md`](examples/sample-report.md).
 
@@ -273,7 +273,7 @@ flowchart LR
    - its type (news, interview, opinion, press release reprint, event listing, institutional)
    - its tone, with a reason
    - how the organisation is named
-   - the programme
+   - the topic
    - a one-sentence description
    - the outlet's country
 4. **Check.** Clipper accepts the tags only when **every** article has exactly one valid tag. Missing ones go back to the tagger, at most twice. If it's still incomplete, there's no report: Clipper would rather say "I couldn't finish" than send a false "no coverage".
@@ -291,7 +291,7 @@ Clipper never depends on one route. If one fails, the others carry on, and the r
 | Route | What it does | Cost |
 |---|---|---|
 | **Your outlet list** | Reads the news feed of every outlet on your checked list, in parallel. Outlets without a feed are searched ten at a time with one site-restricted search. | Free |
-| **Google News** | Searches your names, programmes and people for the period, in each language. At the first sign that Google wants it to slow down, it stops for the rest of the run, so a block costs seconds, not half an hour. | Free |
+| **Google News** | Searches your names, topics and people for the period, in each language. At the first sign that Google wants it to slow down, it stops for the rest of the run, so a block costs seconds, not half an hour. | Free |
 | **Bing News** | A second, independent search that links to the publisher's own page. A result must really name one of your search terms. When Google blocks, Bing and the feeds still bring the news in. | Free |
 | **GDELT** | A global news database, searched with your country's code (249 countries mapped). | Free |
 | **Brave News** | An independent index, used only if you save your own key in `~/.clipper/brave-key.txt`. Never needed. | Paid, optional |
@@ -302,7 +302,7 @@ Clipper never depends on one route. If one fails, the others carry on, and the r
 
 - **Subject:** the names that count as a mention.
 - **Contexts:** words that only count next to a subject name. For example, an acronym that is also an everyday word.
-- **Programmes** and **people:** searched on their own.
+- **Topics** and **people:** searched on their own.
 
 Each search engine gets the searches in its own syntax.
 
@@ -359,7 +359,6 @@ Clipper is free, and every built-in news route is free. The only cost is **Claud
 
 - **Before anything runs,** setup screen 13 shows the tokens per report and per month, and waits for your approval.
 - **Real numbers:** in the first field test, a monthly report with about 20 candidate articles used about **40,000 tokens**.
-- **The estimate is cautious.** It was about twice the real use in that test. Calibrating it is on the roadmap.
 - **Every run note** shows what that run actually used.
 - **To make it cheaper,** ask on screen 13, or later say "make my media report cheaper". Fewer sources, stricter searches and a lower article cap all reduce the cost.
 
@@ -374,7 +373,7 @@ Just talk to Claude.
 | **run my media report** | Collect, read, write and save the Word file. If the last collection never became a report, Clipper finishes that one first. |
 | **run my media report for 1 to 31 October** | Same, for a period you choose |
 | **media monitoring status** | When the last report ran, what it found, which sources failed |
-| **add a programme to monitor** | Adds it, tests it on last week, shows the new cost |
+| **add a topic to monitor** | Adds it, tests it on last week, shows the new cost |
 | **exclude this website from my media report** | Drops it from every future report |
 | **add an outlet** or **remove an outlet** | Changes your source list; new sites are checked first |
 | **group Solar Villages and Clean Air Week under one heading** | Sets `report_groups` |
@@ -390,7 +389,7 @@ Each project lives in its own folder:
 
 ```
 Documents/Clipper/Aurora Climate Lab/
-├── project.yaml     the plan: names, programmes, country, languages, how often
+├── project.yaml     the plan: names, topics, country, languages, how often
 ├── sources.yaml     your checked source list
 ├── data.sqlite      every article, tag and run
 ├── reports/         the Word reports, plus a Markdown copy
@@ -413,20 +412,20 @@ parent_names:                        # the parent body: used for sorting, never 
   - Aurora Foundation
 contexts:                            # words that only count next to a subject name
   initiatives: [ACL]
-programmes: [Green Schools, Solar Villages, Clean Air Week]
+programmes: [Green Schools, Solar Villages, Clean Air Week]   # your topics: products, campaigns, events
 spokespeople: [Giulia Marchetti]
 exclude_domains: [auroraclimatelab.example]   # your own websites
 exclude_terms: [internship, tirocinio, job vacancy]
 own_accounts: []                     # your own social handles, as they appear in the web address
 social: [linkedin, youtube]          # x, linkedin, instagram, facebook, youtube, reddit
-report_groups:                       # optional: programmes that share one report heading
+report_groups:                       # optional: topics that share one report heading
   Solar Villages and Clean Air Week: [Solar Villages, Clean Air Week]
-  other: Other coverage of Aurora Climate Lab   # heading for coverage outside the programmes
+  other: Other coverage of Aurora Climate Lab   # heading for coverage outside your topics
 competitors: {}
 country: IT                          # two-letter ISO code
 languages: [it, en]
 frequency: weekly                    # daily | weekly | monthly
-readers: Senior management
+readers: Management
 report_language: en                  # English only for now
 caps:                                # optional limits
   max_candidates: 180                # articles sent to the tagger
@@ -475,10 +474,10 @@ Clipper retries the missing articles at most twice. If it still can't finish, it
 Yes. Each organisation is its own project with its own folder, source list and history. Say which one when you ask for a report.
 
 **Can I change the report layout?**
-You can group programmes under shared headings, rename the "other coverage" heading, and change how many articles are listed. The section order is fixed, because it follows what leadership readers asked for in the field test.
+You can group topics under shared headings, rename the "other coverage" heading, and change how many articles are listed. The section order is fixed, because it follows what readers asked for in the field test.
 
 **Why a Word file and not a PDF or a web page?**
-That's what leadership readers asked for. A Word file can be forwarded, attached, edited and printed, and it keeps working links. A Markdown copy is saved next to it for your records.
+That's what readers asked for in the field test. A Word file can be forwarded, attached, edited and printed, and it keeps working links. A Markdown copy is saved next to it for your records.
 
 **Does it email the report?**
 Not yet. The Word file is saved in your project folder. Email delivery is on the roadmap.
@@ -496,16 +495,16 @@ No. Clipper uses its own private copy, in its own folder, on its own browser por
 Heavy use can make Google ask a connection to slow down for a few hours. Clipper notices the first refusal and stops asking Google for the rest of the run. Bing News and your outlet feeds carry on. Coverage is thinner during a block, and the run note says so.
 
 **Can it run on a schedule?**
-Setup can schedule runs on your computer. The computer has to be on at that time, and a missed run is covered by the next one. Scheduling hasn't been fully verified yet.
+Setup can schedule runs on your computer. The computer has to be on at that time, and a missed run is covered by the next one.
 
 **Where is my data stored?**
 In your project folder on your computer: the plan, the source list, a SQLite database of articles and tags, the reports and the run notes. Nothing goes to a Clipper server, because there isn't one.
 
 **Does it work on Mac and Linux?**
-The code is plain Python and should run anywhere Claude Code and Python do. So far it has only been tested on Windows.
+The code is plain Python and should run anywhere Claude Code and Python do.
 
 **I set up a project once. Can I change my answers?**
-Yes. Say "set up Clipper" again and choose **Update it**: every screen is pre-filled with your current answers, and your history is kept. Or ask for a single change, like "add a programme to monitor".
+Yes. Say "set up Clipper" again and choose **Update it**: every screen is pre-filled with your current answers, and your history is kept. Or ask for a single change, like "add a topic to monitor".
 
 ---
 
@@ -574,7 +573,7 @@ clipper/
 │   ├── fulltext.py        article text (trafilatura) and subscriber-only detection
 │   ├── gnews_links.py     Google News redirect → publisher link
 │   ├── tags.py            tag validation and the complete-batch rule
-│   ├── layout.py          the leadership report: figures, programme groups, Word output
+│   ├── layout.py          the report: figures, topic groups, Word output
 │   ├── render.py          summary clean-up, report files, run note
 │   ├── estimate.py        last-week test and cost estimate
 │   ├── sources.py         per-project source lists and site checks
@@ -622,7 +621,7 @@ Clipper is a **demo (v1.2)**. It has had one full field test, with a real organi
 - Any country, set by country code and languages.
 - Collection in about one to two minutes, with free fallbacks when Google blocks.
 - The setup screens, including updating an existing project.
-- The leadership report as a Word file, with every figure counted by Clipper.
+- The report as a Word file, with every figure counted by Clipper.
 - The complete-tagging rule, the link guard and the method-word guard.
 - Social search for YouTube, Reddit and public LinkedIn posts.
 
@@ -632,12 +631,6 @@ Clipper is a **demo (v1.2)**. It has had one full field test, with a real organi
 - **GDELT** usually runs out of its time limit and adds little.
 - **Google** can block a connection for hours after heavy use. Clipper fails fast and falls back to Bing and the feeds, but coverage is thinner.
 - **Publisher-link tracing for Google News** is tested with recorded responses, not yet against live Google.
-- **The cost estimate** is about twice the real use.
-- **The X, Instagram and Facebook login flow** hasn't been tested live.
-- **Scheduled runs** aren't verified yet.
-- **The same story in two languages** (a press release in Italian and in English) isn't grouped yet.
-- **Reports are English only,** and there's no email delivery.
-- **Tested on Windows only.**
 
 ---
 

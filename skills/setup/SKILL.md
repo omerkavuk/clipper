@@ -69,7 +69,7 @@ Store the picks in `social` as `linkedin`, `x`, `instagram`, `facebook`, `youtub
 
 **Screen 9: How often.** "**How often do you want the report?**" → "Each report covers everything since the last one." Options: "Weekly, on Monday morning" (default) · "Daily" · "Monthly".
 
-**Screen 10: Who reads it.** "**Who will read the report?**" → "This sets how long the summary is. Reports are in English for now." Options: "Just me" · "My team" · "Senior management" · "Partners or donors". Store the answer in `readers`. Always set `report_language` to `en`.
+**Screen 10: Who reads it.** "**Who will read the report?**" → "This sets how long the summary is. Reports are in English for now." Options: "Just me" · "My team" · "Management" · "Clients or partners". Store the answer in `readers`. Always set `report_language` to `en`.
 
 ## Build the plan (silent)
 
