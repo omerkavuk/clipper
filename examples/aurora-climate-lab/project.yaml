@@ -1,0 +1,39 @@
+name: Aurora Climate Lab
+organisation: Aurora Climate Lab
+subject:
+- Aurora Climate Lab
+- Laboratorio Clima Aurora
+- Aurora Climate Lab for Clean Energy
+- Laboratorio Clima Aurora per l'energia pulita
+parent_names:
+- Aurora Foundation
+- Fondazione Aurora
+contexts:
+  initiatives:
+  - VELA
+  - SV4
+competitors: {}
+exclude_terms:
+- internship
+- tirocinio
+- job vacancy
+exclude_domains:
+- aurora.example
+programmes:
+- Green Schools
+- Solar Villages
+- Clean Air Week
+spokespeople:
+- Giulia Marchetti
+report_groups:
+  Solar Villages and VELA:
+  - Solar Villages
+  other: Other coverage of Aurora Climate Lab
+country: IT
+languages:
+- it
+- en
+frequency: weekly
+report_language: en
+readers: Lab staff and the foundation's leadership
+outlets_file: it

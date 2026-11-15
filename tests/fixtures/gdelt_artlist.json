@@ -1,0 +1,6 @@
+{"articles": [
+ {"url": "https://www.brand-news.it/a1", "title": "Aurora apre un ufficio", "seendate": "20261020T093000Z", "domain": "www.brand-news.it", "language": "Italian", "sourcecountry": "Italy"},
+ {"url": "https://quotidiano.example.it/b2", "title": "Report on development", "seendate": "20261101T120000Z", "domain": "quotidiano.example.it", "language": "English", "sourcecountry": "Italy"},
+ {"url": "https://old.example.it/c3", "title": "Too old", "seendate": "20260901T120000Z", "domain": "old.example.it", "language": "Italian", "sourcecountry": "Italy"},
+ {"url": "https://x.example.it/d4", "title": "Tagalog piece", "seendate": "20261102T120000Z", "domain": "x.example.it", "language": "Tagalog", "sourcecountry": "Italy"}
+]}

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>"Aurora" - Google News</title>
+    <link>https://news.google.com/</link>
+    <language>it</language>
+    <item>
+      <title>Aurora apre un nuovo centro a Roma - Brand News</title>
+      <link>https://news.google.com/rss/articles/CBMiAAA1</link>
+      <guid isPermaLink="false">CBMiAAA1</guid>
+      <pubDate>Tue, 21 Oct 2026 09:30:00 GMT</pubDate>
+      <description>&lt;a href="https://news.google.com/rss/articles/CBMiAAA1"&gt;Aurora apre un nuovo centro a Roma&lt;/a&gt;</description>
+      <source url="https://www.brand-news.it">Brand News</source>
+    </item>
+    <item>
+      <title>Sviluppo sostenibile, il piano dell'Aurora - Il Quotidiano</title>
+      <link>https://news.google.com/rss/articles/CBMiBBB2</link>
+      <guid isPermaLink="false">CBMiBBB2</guid>
+      <pubDate>Mon, 03 Nov 2026 14:00:00 GMT</pubDate>
+      <description>Sviluppo sostenibile, il piano dell'Aurora</description>
+      <source url="https://quotidiano.example.it">Il Quotidiano</source>
+    </item>
+    <item>
+      <title>Aurora vecchia notizia - Archivio</title>
+      <link>https://news.google.com/rss/articles/CBMiCCC3</link>
+      <guid isPermaLink="false">CBMiCCC3</guid>
+      <pubDate>Mon, 01 Sep 2026 08:00:00 GMT</pubDate>
+      <description>Aurora vecchia notizia</description>
+      <source url="https://archivio.example.it">Archivio</source>
+    </item>
+  </channel>
+</rss>

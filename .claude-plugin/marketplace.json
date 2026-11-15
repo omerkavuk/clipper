@@ -1,0 +1,11 @@
+{
+  "name": "clipper-local",
+  "owner": { "name": "Omer" },
+  "plugins": [
+    {
+      "name": "clipper",
+      "source": "./",
+      "description": "Set up and run a regular media-monitoring report for your organisation."
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "name": "clipper",
+  "version": "1.2.0",
+  "description": "Watch news sites, think tanks, institutions and social media for your organisation, and get a regular report ready to forward.",
+  "author": { "name": "Omer" },
+  "license": "MIT"
+}

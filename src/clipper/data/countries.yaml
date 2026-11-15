@@ -1,0 +1,254 @@
+# Country names and GDELT source-country codes, keyed by ISO 3166-1 alpha-2.
+# GDELT uses FIPS 10-4 codes, which often differ from ISO (Germany is GM, the UK is UK).
+# Built from GDELT's LOOKUP-COUNTRIES.TXT joined on English names; gdelt: null means
+# GDELT has no source-country code for it, so GDELT is skipped for that country.
+countries:
+  "AD": {name: "Andorra", gdelt: "AN"}
+  "AE": {name: "United Arab Emirates", gdelt: "AE"}
+  "AF": {name: "Afghanistan", gdelt: "AF"}
+  "AG": {name: "Antigua and Barbuda", gdelt: "AC"}
+  "AI": {name: "Anguilla", gdelt: "AV"}
+  "AL": {name: "Albania", gdelt: "AL"}
+  "AM": {name: "Armenia", gdelt: "AM"}
+  "AO": {name: "Angola", gdelt: "AO"}
+  "AQ": {name: "Antarctica", gdelt: "AY"}
+  "AR": {name: "Argentina", gdelt: "AR"}
+  "AS": {name: "American Samoa", gdelt: "AQ"}
+  "AT": {name: "Austria", gdelt: "AU"}
+  "AU": {name: "Australia", gdelt: "AS"}
+  "AW": {name: "Aruba", gdelt: "AA"}
+  "AX": {name: "Åland Islands", gdelt: null}
+  "AZ": {name: "Azerbaijan", gdelt: "AJ"}
+  "BA": {name: "Bosnia and Herzegovina", gdelt: "BK"}
+  "BB": {name: "Barbados", gdelt: "BB"}
+  "BD": {name: "Bangladesh", gdelt: "BG"}
+  "BE": {name: "Belgium", gdelt: "BE"}
+  "BF": {name: "Burkina Faso", gdelt: "UV"}
+  "BG": {name: "Bulgaria", gdelt: "BU"}
+  "BH": {name: "Bahrain", gdelt: "BA"}
+  "BI": {name: "Burundi", gdelt: "BY"}
+  "BJ": {name: "Benin", gdelt: "BN"}
+  "BL": {name: "Saint Barthélemy", gdelt: "TB"}
+  "BM": {name: "Bermuda", gdelt: "BD"}
+  "BN": {name: "Brunei", gdelt: "BX"}
+  "BO": {name: "Bolivia", gdelt: "BL"}
+  "BQ": {name: "Bonaire, Sint Eustatius and Saba", gdelt: null}
+  "BR": {name: "Brazil", gdelt: "BR"}
+  "BS": {name: "Bahamas", gdelt: "BF"}
+  "BT": {name: "Bhutan", gdelt: "BT"}
+  "BV": {name: "Bouvet Island", gdelt: "BV"}
+  "BW": {name: "Botswana", gdelt: "BC"}
+  "BY": {name: "Belarus", gdelt: "BO"}
+  "BZ": {name: "Belize", gdelt: "BH"}
+  "CA": {name: "Canada", gdelt: "CA"}
+  "CC": {name: "Cocos (Keeling) Islands", gdelt: "CK"}
+  "CD": {name: "Democratic Republic of the Congo", gdelt: "CG"}
+  "CF": {name: "Central African Republic", gdelt: "CT"}
+  "CG": {name: "Congo", gdelt: "CF"}
+  "CH": {name: "Switzerland", gdelt: "SZ"}
+  "CI": {name: "Côte d'Ivoire", gdelt: "IV"}
+  "CK": {name: "Cook Islands", gdelt: "CW"}
+  "CL": {name: "Chile", gdelt: "CI"}
+  "CM": {name: "Cameroon", gdelt: "CM"}
+  "CN": {name: "China", gdelt: "CH"}
+  "CO": {name: "Colombia", gdelt: "CO"}
+  "CR": {name: "Costa Rica", gdelt: "CS"}
+  "CU": {name: "Cuba", gdelt: "CU"}
+  "CV": {name: "Cabo Verde", gdelt: "CV"}
+  "CW": {name: "Curaçao", gdelt: null}
+  "CX": {name: "Christmas Island", gdelt: "KT"}
+  "CY": {name: "Cyprus", gdelt: "CY"}
+  "CZ": {name: "Czechia", gdelt: "EZ"}
+  "DE": {name: "Germany", gdelt: "GM"}
+  "DJ": {name: "Djibouti", gdelt: "DJ"}
+  "DK": {name: "Denmark", gdelt: "DA"}
+  "DM": {name: "Dominica", gdelt: "DO"}
+  "DO": {name: "Dominican Republic", gdelt: "DR"}
+  "DZ": {name: "Algeria", gdelt: "AG"}
+  "EC": {name: "Ecuador", gdelt: "EC"}
+  "EE": {name: "Estonia", gdelt: "EN"}
+  "EG": {name: "Egypt", gdelt: "EG"}
+  "EH": {name: "Western Sahara", gdelt: "WI"}
+  "ER": {name: "Eritrea", gdelt: "ER"}
+  "ES": {name: "Spain", gdelt: "SP"}
+  "ET": {name: "Ethiopia", gdelt: "ET"}
+  "FI": {name: "Finland", gdelt: "FI"}
+  "FJ": {name: "Fiji", gdelt: "FJ"}
+  "FK": {name: "Falkland Islands", gdelt: "FK"}
+  "FM": {name: "Micronesia", gdelt: "FM"}
+  "FO": {name: "Faroe Islands", gdelt: "FO"}
+  "FR": {name: "France", gdelt: "FR"}
+  "GA": {name: "Gabon", gdelt: "GB"}
+  "GB": {name: "United Kingdom", gdelt: "UK"}
+  "GD": {name: "Grenada", gdelt: "GJ"}
+  "GE": {name: "Georgia", gdelt: "GG"}
+  "GF": {name: "French Guiana", gdelt: "FG"}
+  "GG": {name: "Guernsey", gdelt: "GK"}
+  "GH": {name: "Ghana", gdelt: "GH"}
+  "GI": {name: "Gibraltar", gdelt: "GI"}
+  "GL": {name: "Greenland", gdelt: "GL"}
+  "GM": {name: "Gambia", gdelt: "GA"}
+  "GN": {name: "Guinea", gdelt: "GV"}
+  "GP": {name: "Guadeloupe", gdelt: "GP"}
+  "GQ": {name: "Equatorial Guinea", gdelt: "EK"}
+  "GR": {name: "Greece", gdelt: "GR"}
+  "GS": {name: "South Georgia and the South Sandwich Islands", gdelt: "SX"}
+  "GT": {name: "Guatemala", gdelt: "GT"}
+  "GU": {name: "Guam", gdelt: "GQ"}
+  "GW": {name: "Guinea-Bissau", gdelt: "PU"}
+  "GY": {name: "Guyana", gdelt: "GY"}
+  "HK": {name: "Hong Kong", gdelt: "HK"}
+  "HM": {name: "Heard Island and McDonald Islands", gdelt: "HM"}
+  "HN": {name: "Honduras", gdelt: "HO"}
+  "HR": {name: "Croatia", gdelt: "HR"}
+  "HT": {name: "Haiti", gdelt: "HA"}
+  "HU": {name: "Hungary", gdelt: "HU"}
+  "ID": {name: "Indonesia", gdelt: "ID"}
+  "IE": {name: "Ireland", gdelt: "EI"}
+  "IL": {name: "Israel", gdelt: "IS"}
+  "IM": {name: "Isle of Man", gdelt: "IM"}
+  "IN": {name: "India", gdelt: "IN"}
+  "IO": {name: "British Indian Ocean Territory", gdelt: "IO"}
+  "IQ": {name: "Iraq", gdelt: "IZ"}
+  "IR": {name: "Iran", gdelt: "IR"}
+  "IS": {name: "Iceland", gdelt: "IC"}
+  "IT": {name: "Italy", gdelt: "IT"}
+  "JE": {name: "Jersey", gdelt: "JE"}
+  "JM": {name: "Jamaica", gdelt: "JM"}
+  "JO": {name: "Jordan", gdelt: "JO"}
+  "JP": {name: "Japan", gdelt: "JA"}
+  "KE": {name: "Kenya", gdelt: "KE"}
+  "KG": {name: "Kyrgyzstan", gdelt: "KG"}
+  "KH": {name: "Cambodia", gdelt: "CB"}
+  "KI": {name: "Kiribati", gdelt: "KR"}
+  "KM": {name: "Comoros", gdelt: "CN"}
+  "KN": {name: "Saint Kitts and Nevis", gdelt: "SC"}
+  "KP": {name: "North Korea", gdelt: "KN"}
+  "KR": {name: "South Korea", gdelt: "KS"}
+  "KW": {name: "Kuwait", gdelt: "KU"}
+  "KY": {name: "Cayman Islands", gdelt: "CJ"}
+  "KZ": {name: "Kazakhstan", gdelt: "KZ"}
+  "LA": {name: "Laos", gdelt: "LA"}
+  "LB": {name: "Lebanon", gdelt: "LE"}
+  "LC": {name: "Saint Lucia", gdelt: "ST"}
+  "LI": {name: "Liechtenstein", gdelt: "LS"}
+  "LK": {name: "Sri Lanka", gdelt: "CE"}
+  "LR": {name: "Liberia", gdelt: "LI"}
+  "LS": {name: "Lesotho", gdelt: "LT"}
+  "LT": {name: "Lithuania", gdelt: "LH"}
+  "LU": {name: "Luxembourg", gdelt: "LU"}
+  "LV": {name: "Latvia", gdelt: "LG"}
+  "LY": {name: "Libya", gdelt: "LY"}
+  "MA": {name: "Morocco", gdelt: "MO"}
+  "MC": {name: "Monaco", gdelt: "MN"}
+  "MD": {name: "Moldova", gdelt: "MD"}
+  "ME": {name: "Montenegro", gdelt: "MJ"}
+  "MF": {name: "Saint Martin", gdelt: "RN"}
+  "MG": {name: "Madagascar", gdelt: "MA"}
+  "MH": {name: "Marshall Islands", gdelt: "RM"}
+  "MK": {name: "North Macedonia", gdelt: "MK"}
+  "ML": {name: "Mali", gdelt: "ML"}
+  "MM": {name: "Myanmar", gdelt: "BM"}
+  "MN": {name: "Mongolia", gdelt: "MG"}
+  "MO": {name: "Macao", gdelt: "MC"}
+  "MP": {name: "Northern Mariana Islands", gdelt: "CQ"}
+  "MQ": {name: "Martinique", gdelt: "MB"}
+  "MR": {name: "Mauritania", gdelt: "MR"}
+  "MS": {name: "Montserrat", gdelt: "MH"}
+  "MT": {name: "Malta", gdelt: "MT"}
+  "MU": {name: "Mauritius", gdelt: "MP"}
+  "MV": {name: "Maldives", gdelt: "MV"}
+  "MW": {name: "Malawi", gdelt: "MI"}
+  "MX": {name: "Mexico", gdelt: "MX"}
+  "MY": {name: "Malaysia", gdelt: "MY"}
+  "MZ": {name: "Mozambique", gdelt: "MZ"}
+  "NA": {name: "Namibia", gdelt: "WA"}
+  "NC": {name: "New Caledonia", gdelt: "NC"}
+  "NE": {name: "Niger", gdelt: "NG"}
+  "NF": {name: "Norfolk Island", gdelt: "NF"}
+  "NG": {name: "Nigeria", gdelt: "NI"}
+  "NI": {name: "Nicaragua", gdelt: "NU"}
+  "NL": {name: "Netherlands", gdelt: "NL"}
+  "NO": {name: "Norway", gdelt: "NO"}
+  "NP": {name: "Nepal", gdelt: "NP"}
+  "NR": {name: "Nauru", gdelt: "NR"}
+  "NU": {name: "Niue", gdelt: "NE"}
+  "NZ": {name: "New Zealand", gdelt: "NZ"}
+  "OM": {name: "Oman", gdelt: "MU"}
+  "PA": {name: "Panama", gdelt: "PM"}
+  "PE": {name: "Peru", gdelt: "PE"}
+  "PF": {name: "French Polynesia", gdelt: "FP"}
+  "PG": {name: "Papua New Guinea", gdelt: "PP"}
+  "PH": {name: "Philippines", gdelt: "RP"}
+  "PK": {name: "Pakistan", gdelt: "PK"}
+  "PL": {name: "Poland", gdelt: "PL"}
+  "PM": {name: "Saint Pierre and Miquelon", gdelt: "SB"}
+  "PN": {name: "Pitcairn Islands", gdelt: "PC"}
+  "PR": {name: "Puerto Rico", gdelt: "RQ"}
+  "PS": {name: "Palestine", gdelt: null}
+  "PT": {name: "Portugal", gdelt: "PO"}
+  "PW": {name: "Palau", gdelt: "PS"}
+  "PY": {name: "Paraguay", gdelt: "PA"}
+  "QA": {name: "Qatar", gdelt: "QA"}
+  "RE": {name: "Réunion", gdelt: "RE"}
+  "RO": {name: "Romania", gdelt: "RO"}
+  "RS": {name: "Serbia", gdelt: "RI"}
+  "RU": {name: "Russia", gdelt: "RS"}
+  "RW": {name: "Rwanda", gdelt: "RW"}
+  "SA": {name: "Saudi Arabia", gdelt: "SA"}
+  "SB": {name: "Solomon Islands", gdelt: "BP"}
+  "SC": {name: "Seychelles", gdelt: "SE"}
+  "SD": {name: "Sudan", gdelt: "SU"}
+  "SE": {name: "Sweden", gdelt: "SW"}
+  "SG": {name: "Singapore", gdelt: "SN"}
+  "SH": {name: "Saint Helena", gdelt: "SH"}
+  "SI": {name: "Slovenia", gdelt: "SI"}
+  "SJ": {name: "Svalbard and Jan Mayen", gdelt: "SV"}
+  "SK": {name: "Slovakia", gdelt: "LO"}
+  "SL": {name: "Sierra Leone", gdelt: "SL"}
+  "SM": {name: "San Marino", gdelt: "SM"}
+  "SN": {name: "Senegal", gdelt: "SG"}
+  "SO": {name: "Somalia", gdelt: "SO"}
+  "SR": {name: "Suriname", gdelt: "NS"}
+  "SS": {name: "South Sudan", gdelt: "OD"}
+  "ST": {name: "Sao Tome and Principe", gdelt: "TP"}
+  "SV": {name: "El Salvador", gdelt: "ES"}
+  "SX": {name: "Sint Maarten", gdelt: null}
+  "SY": {name: "Syria", gdelt: "SY"}
+  "SZ": {name: "Eswatini", gdelt: "WZ"}
+  "TC": {name: "Turks and Caicos Islands", gdelt: "TK"}
+  "TD": {name: "Chad", gdelt: "CD"}
+  "TF": {name: "French Southern Territories", gdelt: "FS"}
+  "TG": {name: "Togo", gdelt: "TO"}
+  "TH": {name: "Thailand", gdelt: "TH"}
+  "TJ": {name: "Tajikistan", gdelt: "TI"}
+  "TK": {name: "Tokelau", gdelt: "TL"}
+  "TL": {name: "Timor-Leste", gdelt: "TT"}
+  "TM": {name: "Turkmenistan", gdelt: "TX"}
+  "TN": {name: "Tunisia", gdelt: "TS"}
+  "TO": {name: "Tonga", gdelt: "TN"}
+  "TR": {name: "Türkiye", gdelt: "TU"}
+  "TT": {name: "Trinidad and Tobago", gdelt: "TD"}
+  "TV": {name: "Tuvalu", gdelt: "TV"}
+  "TW": {name: "Taiwan", gdelt: "TW"}
+  "TZ": {name: "Tanzania", gdelt: "TZ"}
+  "UA": {name: "Ukraine", gdelt: "UP"}
+  "UG": {name: "Uganda", gdelt: "UG"}
+  "UM": {name: "United States Minor Outlying Islands", gdelt: null}
+  "US": {name: "United States", gdelt: "US"}
+  "UY": {name: "Uruguay", gdelt: "UY"}
+  "UZ": {name: "Uzbekistan", gdelt: "UZ"}
+  "VA": {name: "Holy See", gdelt: "VT"}
+  "VC": {name: "Saint Vincent and the Grenadines", gdelt: "VC"}
+  "VE": {name: "Venezuela", gdelt: "VE"}
+  "VG": {name: "British Virgin Islands", gdelt: "VI"}
+  "VI": {name: "U.S. Virgin Islands", gdelt: "VQ"}
+  "VN": {name: "Viet Nam", gdelt: "VM"}
+  "VU": {name: "Vanuatu", gdelt: "NH"}
+  "WF": {name: "Wallis and Futuna", gdelt: "WF"}
+  "WS": {name: "Samoa", gdelt: "WS"}
+  "YE": {name: "Yemen", gdelt: "YM"}
+  "YT": {name: "Mayotte", gdelt: "MF"}
+  "ZA": {name: "South Africa", gdelt: "SF"}
+  "ZM": {name: "Zambia", gdelt: "ZA"}
+  "ZW": {name: "Zimbabwe", gdelt: "ZI"}

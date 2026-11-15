@@ -1,0 +1,373 @@
+outlets:
+- name: ANSA
+  domain: ansa.it
+  feed: https://www.ansa.it/rss.xml
+  tier: agency
+  region: null
+  paywall: false
+- name: AGI
+  domain: agi.it
+  feed: https://www.agi.it/rss
+  tier: agency
+  region: null
+  paywall: false
+- name: Adnkronos
+  domain: adnkronos.com
+  feed: https://www.adnkronos.com/rss.xml
+  tier: agency
+  region: null
+  paywall: false
+- name: Askanews
+  domain: askanews.it
+  feed: https://askanews.it/feed/
+  tier: agency
+  region: null
+  paywall: false
+- name: Corriere della Sera
+  domain: corriere.it
+  feed: null
+  tier: national
+  region: null
+  paywall: true
+- name: la Repubblica
+  domain: repubblica.it
+  feed: null
+  tier: national
+  region: null
+  paywall: false
+- name: La Stampa
+  domain: lastampa.it
+  feed: https://www.lastampa.it/rss/copertina.xml
+  tier: national
+  region: null
+  paywall: false
+- name: Il Sole 24 Ore
+  domain: ilsole24ore.com
+  feed: https://www.ilsole24ore.com/rss/homepage.xml
+  tier: national
+  region: null
+  paywall: true
+- name: Il Messaggero
+  domain: ilmessaggero.it
+  feed: null
+  tier: national
+  region: null
+  paywall: false
+- name: Avvenire
+  domain: avvenire.it
+  feed: null
+  tier: national
+  region: null
+  paywall: false
+- name: Il Fatto Quotidiano
+  domain: ilfattoquotidiano.it
+  feed: https://www.ilfattoquotidiano.it/feed/
+  tier: national
+  region: null
+  paywall: false
+- name: RaiNews
+  domain: rainews.it
+  feed: null
+  tier: broadcaster
+  region: null
+  paywall: false
+- name: Sky TG24
+  domain: tg24.sky.it
+  feed: null
+  tier: broadcaster
+  region: null
+  paywall: false
+- name: TGCom24
+  domain: tgcom24.mediaset.it
+  feed: https://www.tgcom24.mediaset.it/rss
+  tier: broadcaster
+  region: null
+  paywall: false
+- name: Teleborsa
+  domain: teleborsa.it
+  feed: https://news.teleborsa.it/newsfeed.ashx
+  tier: specialist
+  region: null
+  paywall: false
+- name: Il Giornale
+  domain: ilgiornale.it
+  feed: null
+  tier: national
+  region: null
+  paywall: false
+- name: Il Gazzettino
+  domain: ilgazzettino.it
+  feed: null
+  tier: regional
+  region: Veneto
+  paywall: false
+- name: Il Resto del Carlino
+  domain: ilrestodelcarlino.it
+  feed: https://www.ilrestodelcarlino.it/rss
+  tier: regional
+  region: Emilia-Romagna
+  paywall: false
+- name: La Nazione
+  domain: lanazione.it
+  feed: https://www.lanazione.it/rss
+  tier: regional
+  region: Toscana
+  paywall: false
+- name: Il Secolo XIX
+  domain: ilsecoloxix.it
+  feed: null
+  tier: regional
+  region: Liguria
+  paywall: false
+- name: L'Unione Sarda
+  domain: unionesarda.it
+  feed: null
+  tier: regional
+  region: Sardegna
+  paywall: false
+- name: Il Mattino
+  domain: ilmattino.it
+  feed: null
+  tier: regional
+  region: Campania
+  paywall: false
+- name: Gazzetta del Sud
+  domain: gazzettadelsud.it
+  feed: https://gazzettadelsud.it/upload/assets/rss/producer-nazionale-homepage.xml
+  tier: regional
+  region: Sicilia
+  paywall: false
+- name: La Gazzetta del Mezzogiorno
+  domain: lagazzettadelmezzogiorno.it
+  feed: https://feeds.feedburner.com/lagazzettadelmezzogiorno/viyi6z8dkwu
+  tier: regional
+  region: Puglia
+  paywall: false
+- name: Giornale di Sicilia
+  domain: gds.it
+  feed: https://gds.it/upload/assets/rss/producer-sicilia-homepage.xml
+  tier: regional
+  region: Sicilia
+  paywall: false
+- name: Il Piccolo
+  domain: ilpiccolo.it
+  feed: null
+  tier: regional
+  region: Friuli-Venezia Giulia
+  paywall: false
+- name: Il Tirreno
+  domain: iltirreno.it
+  feed: null
+  tier: regional
+  region: Toscana
+  paywall: false
+- name: Corriere dell'Umbria
+  domain: corrieredellumbria.it
+  feed: null
+  tier: regional
+  region: Umbria
+  paywall: false
+- name: Il Centro
+  domain: ilcentro.it
+  feed: null
+  tier: regional
+  region: Abruzzo
+  paywall: false
+- name: Il Giorno
+  domain: ilgiorno.it
+  feed: https://www.ilgiorno.it/rss
+  tier: regional
+  region: Lombardia
+  paywall: false
+- name: Canale Energia
+  domain: canaleenergia.com
+  feed: https://www.canaleenergia.com/feed/
+  tier: specialist
+  region: null
+  paywall: false
+- name: QualEnergia
+  domain: qualenergia.it
+  feed: https://www.qualenergia.it/feed/
+  tier: specialist
+  region: null
+  paywall: false
+- name: Eco dalle Città
+  domain: ecodallecitta.it
+  feed: https://www.ecodallecitta.it/feed/
+  tier: specialist
+  region: null
+  paywall: false
+- name: ESG360
+  domain: esg360.it
+  feed: https://www.esg360.it/feed/
+  tier: specialist
+  region: null
+  paywall: false
+- name: Vita
+  domain: vita.it
+  feed: https://www.vita.it/feed
+  tier: specialist
+  region: null
+  paywall: false
+- name: Info-Cooperazione
+  domain: info-cooperazione.it
+  feed: null
+  tier: specialist
+  region: null
+  paywall: false
+- name: Onu Italia
+  domain: onuitalia.com
+  feed: https://onuitalia.com/feed/
+  tier: specialist
+  region: null
+  paywall: false
+- name: AgenSIR
+  domain: agensir.it
+  feed: https://www.agensir.it/feed
+  tier: agency
+  region: null
+  paywall: false
+- name: ADC Group
+  domain: adcgroup.it
+  feed: null
+  tier: trade
+  region: null
+  paywall: true
+- name: Media Key
+  domain: mediakey.it
+  feed: https://mediakey.it/feed/
+  tier: trade
+  region: null
+  paywall: false
+- name: Brand News
+  domain: brand-news.it
+  feed: https://brand-news.it/feed/
+  tier: trade
+  region: null
+  paywall: false
+- name: PPN ADI Prima Pagina News
+  domain: primapaginanews.it
+  feed: https://www.primapaginanews.it/feed/
+  tier: agency
+  region: null
+  paywall: false
+- name: PROTECTAweb
+  domain: protectaweb.it
+  feed: https://protectaweb.it/feed/
+  tier: trade
+  region: null
+  paywall: false
+- name: MASE
+  domain: mase.gov.it
+  feed: null
+  tier: institutional
+  region: null
+  paywall: false
+- name: Politecnico di Torino
+  domain: polito.it
+  feed: https://www.polito.it/rss.xml
+  tier: institutional
+  region: Piemonte
+  paywall: false
+- name: Soka Gakkai Italia
+  domain: sgi-italia.org
+  feed: https://www.sgi-italia.org/feed/
+  tier: institutional
+  region: null
+  paywall: false
+- name: Il Foglio
+  domain: ilfoglio.it
+  feed: null
+  tier: national
+  region: null
+  paywall: false
+- name: Il Manifesto
+  domain: ilmanifesto.it
+  feed: https://ilmanifesto.it/feed
+  tier: national
+  region: null
+  paywall: false
+- name: Il Quotidiano del Sud
+  domain: quotidianodelsud.it
+  feed: https://www.quotidianodelsud.it/feed
+  tier: regional
+  region: Calabria
+  paywall: false
+- name: ItaliaOggi
+  domain: italiaoggi.it
+  feed: null
+  tier: national
+  region: null
+  paywall: false
+- name: Libero
+  domain: liberoquotidiano.it
+  feed: null
+  tier: national
+  region: null
+  paywall: false
+- name: Il Tempo
+  domain: iltempo.it
+  feed: null
+  tier: national
+  region: null
+  paywall: false
+- name: Open
+  domain: open.online
+  feed: https://www.open.online/feed
+  tier: national
+  region: null
+  paywall: false
+- name: Greenreport
+  domain: greenreport.it
+  feed: https://www.greenreport.it/?format=feed&type=rss
+  tier: specialist
+  region: null
+  paywall: false
+- name: Ministero degli Affari Esteri e della Cooperazione Internazionale
+  domain: esteri.it
+  feed: null
+  tier: institutional
+  region: null
+  paywall: false
+- name: AICS
+  domain: aics.gov.it
+  feed: null
+  tier: institutional
+  region: null
+  paywall: false
+- name: Governo italiano
+  domain: governo.it
+  feed: null
+  tier: institutional
+  region: null
+  paywall: false
+- name: ISPI
+  domain: ispionline.it
+  feed: null
+  tier: specialist
+  region: null
+  paywall: false
+- name: Istituto Affari Internazionali
+  domain: iai.it
+  feed: null
+  tier: specialist
+  region: null
+  paywall: false
+- name: ECCO
+  domain: eccoclimate.org
+  feed: null
+  tier: specialist
+  region: null
+  paywall: false
+- name: CeSPI
+  domain: cespi.it
+  feed: null
+  tier: specialist
+  region: null
+  paywall: false
+- name: FEEM
+  domain: feem.it
+  feed: null
+  tier: specialist
+  region: null
+  paywall: false
