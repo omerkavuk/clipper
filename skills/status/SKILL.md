@@ -11,7 +11,9 @@ Explain the state of the user's media monitoring in plain words. They are not te
 
 The plugin root is two directories above this skill's base directory (Claude shows "Base directory for this skill" when the skill loads). Use that path exactly as shown in the Base directory line, in its native operating-system form (on Windows, `C:\Users\...`). Never convert it to a `/c/Users/...` form, because the command then fails. Always put it in double quotes.
 
-    python -m uv run --directory "<plugin root>" clipper <command> ...
+    uv run --directory "<plugin root>" clipper <command> ...
+
+If `uv` is not found, use `python3 -m uv run …` (macOS and Linux) or `python -m uv run …` (Windows) instead, with the same arguments. Remember which form worked and use it for every later command.
 
 Always quote paths. Every command prints one JSON object. Parse it; on `"ok": false`, stop and explain plainly what went wrong. Do not hide or redirect the command's error output (no `2>$null`, no `2>/dev/null`): `collect` and `test-queries` print short progress lines there, and the user should see them. Only the standard output is the JSON.
 

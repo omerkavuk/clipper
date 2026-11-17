@@ -25,26 +25,51 @@ PAYWALL_PHRASES = ("abbonati", "riservato agli abbonati", "contenuto riservato",
                    "subscribe", "subscribers only")
 BLOCKED_STATUSES = (401, 402, 403)
 GOOGLE_PAUSE_SECONDS = 1.0
-GOOGLE_BUDGET = 40  # links resolved per run at most, so a long list cannot get us blocked
-_google = {"blocked": False, "used": 0}  # one CLI command is one run
+GOOGLE_BUDGET = 200  # links resolved per run at most, so a long list cannot get us blocked
+_google = {"blocked": False, "used": 0, "resolved": 0, "failed": 0, "reasons": {}}  # one command = one run
 
 
 def reset_google_state() -> None:
-    _google.update(blocked=False, used=0)
+    _google.update(blocked=False, used=0, resolved=0, failed=0, reasons={})
+
+
+def google_link_stats() -> dict:
+    """How the Google News link look-ups went this run, for the run note."""
+    return {"resolved": _google["resolved"], "failed": _google["failed"],
+            "reasons": dict(_google["reasons"]), "blocked": _google["blocked"]}
+
+
+def _failed(reason: str) -> None:
+    _google["failed"] += 1
+    _google["reasons"][reason] = _google["reasons"].get(reason, 0) + 1
 
 
 def _publisher_url(url: str, http) -> str | None:
     """The publisher link behind a Google News link, within this run's limits."""
-    if _google["blocked"] or _google["used"] >= GOOGLE_BUDGET:
+    if _google["blocked"]:
+        _failed("Google asked to slow down")
+        return None
+    if _google["used"] >= GOOGLE_BUDGET:
+        _failed("look-up limit for this run reached")
         return None
     if _google["used"]:
         time.sleep(GOOGLE_PAUSE_SECONDS)
     _google["used"] += 1
     try:
-        return gnews_links.resolve(url, http)
+        found = gnews_links.resolve(url, http)
     except gnews_links.GoogleBlocked:
         _google["blocked"] = True
+        _failed("Google asked to slow down")
         return None
+    except gnews_links.Unresolved as e:
+        _failed(str(e))
+        return None
+    except Exception as e:  # network trouble: count it, never stop the run
+        _failed(f"network error: {type(e).__name__}")
+        return None
+    if found:
+        _google["resolved"] += 1
+    return found
 
 
 def fetch_full_text(item: Item, outlet: Outlet | None, session=None) -> Item:

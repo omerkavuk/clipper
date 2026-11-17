@@ -173,3 +173,29 @@ def test_eleven_outlets_make_two_site_searches():
     responses.add(responses.GET, GNEWS, body=GNEWS_FEED)
     make(batch).collect([Q], WINDOW)
     assert len(responses.calls) == 2
+
+
+SHALLOW_FEED = """<?xml version="1.0"?><rss version="2.0"><channel><title>x</title>
+<item><title>Aurora oggi</title><link>https://www.example.it/new</link>
+<pubDate>Thu, 12 Nov 2026 10:00:00 GMT</pubDate><description>Aurora</description></item>
+</channel></rss>"""
+
+
+@responses.activate
+def test_shallow_feed_gets_a_site_search_for_older_weeks():
+    from urllib.parse import parse_qs, urlparse
+    responses.add(responses.GET, FEED_URL, body=SHALLOW_FEED)
+    responses.add(responses.GET, GNEWS, body=GNEWS_FEED)
+    items, statuses = make([outlet()]).collect([Q], WINDOW)
+    assert sorted(i.url for i in items) == ["https://news.google.com/rss/articles/X1",
+                                            "https://www.example.it/new"]
+    q = parse_qs(urlparse(responses.calls[1].request.url).query)["q"][0]
+    assert "site:example.it" in q and "before:2026-11-13" in q  # only the part the feed misses
+    assert statuses[0].covered_since == WINDOW.since and statuses[0].items == 2
+
+
+@responses.activate
+def test_deep_feed_needs_no_site_search():
+    responses.add(responses.GET, FEED_URL, body=FEED)
+    make([outlet()]).collect([Q], WINDOW)
+    assert len(responses.calls) == 1

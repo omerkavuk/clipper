@@ -129,8 +129,10 @@ def test_candidates_respect_cap_and_fetch_limit(store, p, tmp_path):
     out = tmp_path / "sub dir" / "c.json"
     stats = export_candidates(store, run_id, Caps(), out, p, fetch=fetch)
     assert len(stats.pop("candidate_ids")) == 150
+    warning = stats.pop("warning")
     assert stats == {"exported": 150, "truncated": 50, "fulltext_attempted": 30,
-                     "fulltext_fetched": 30}
+                     "fulltext_fetched": 30, "max_candidates": 150}
+    assert warning.startswith("50 collected articles were left out")
     data = json.loads(out.read_text(encoding="utf-8"))
     assert len(data["items"]) == 150 and data["truncated"] == 50 and len(calls) == 30
     assert len(data["items"][0]["text_excerpt"]) == 1500
@@ -147,7 +149,8 @@ def test_candidates_ranking(store, p, tmp_path):
     out = tmp_path / "c.json"
     export_candidates(store, run_id, Caps(max_fulltext=0), out, p, fetch=fake_fetch)
     outlets = [i["outlet"] for i in json.loads(out.read_text(encoding="utf-8"))["items"]]
-    assert outlets == ["Outlet4", "Outlet3", "Outlet5", "Outlet2", "Outlet1"]
+    # topic, person and name-with-context matches first (newest first), then a bare name match
+    assert outlets == ["Outlet5", "Outlet3", "Outlet2", "Outlet4", "Outlet1"]
 
 
 def test_candidates_mark_untrusted(store, p, tmp_path):
@@ -188,7 +191,7 @@ def test_fulltext_fetched_counts_successes(store, p, tmp_path):
     assert stats["fulltext_attempted"] == 2 and stats["fulltext_fetched"] == 0
 
 
-def test_ranking_prefers_subject_then_more_queries_then_programme(store, p, tmp_path):
+def test_ranking_prefers_specific_matches_then_more_queries(store, p, tmp_path):
     items = [mk(1, queries=("programme:VELA",)),
              mk(2, queries=("subject×initiatives",)),
              mk(3, queries=("programme:Y", "person:Z")),
@@ -198,10 +201,8 @@ def test_ranking_prefers_subject_then_more_queries_then_programme(store, p, tmp_
     out = tmp_path / "c.json"
     export_candidates(store, run_id, Caps(max_fulltext=0), out, p, fetch=fake_fetch)
     outlets = [i["outlet"] for i in json.loads(out.read_text(encoding="utf-8"))["items"]]
-    # subject first; two queries beat one; programme beats other; newest first within ties
-    assert outlets == ["Outlet2", "Outlet3", "Outlet5", "Outlet1", "Outlet4"]
-    assert outlets.index("Outlet1") > outlets.index("Outlet2")
-    assert outlets.index("Outlet1") > outlets.index("Outlet3")
+    # specific matches first; two searches beat one; newest first within ties; others last
+    assert outlets == ["Outlet3", "Outlet5", "Outlet2", "Outlet1", "Outlet4"]
 
 
 def test_social_domains_excluded_by_default(store, p):
@@ -235,3 +236,15 @@ def test_first_collector_link_wins_dedupe(store, p):
                                  url="https://news.google.com/rss/articles/abc")
     run_id = collect(p, store, WIN, [FakeOK([own]), FakeOK([google])])
     assert [i.url for i in store.items(run_id)] == ["https://o1.it/a1"]
+
+
+def test_long_window_scales_the_cap(store, p, tmp_path):
+    from clipper.pipeline import scaled_caps
+    assert scaled_caps(Caps(max_candidates=30, max_fulltext=30), 36, "weekly").max_candidates == 180
+    assert scaled_caps(Caps(max_candidates=30), 7, "weekly").max_candidates == 30
+    assert scaled_caps(Caps(max_candidates=30), 400, "weekly").max_candidates == 180  # at most 6x
+    long = RunWindow(NOW - timedelta(days=21), NOW)
+    run_id = collect(p, store, long, [FakeOK([mk(n) for n in range(1, 41)])])
+    stats = export_candidates(store, run_id, Caps(max_candidates=10, max_fulltext=0),
+                              tmp_path / "c.json", p, fetch=fake_fetch)
+    assert stats["exported"] == 30 and stats["truncated"] == 10 and "warning" in stats

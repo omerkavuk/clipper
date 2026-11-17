@@ -10,13 +10,17 @@ import requests
 from clipper import countries
 from clipper.collectors import SourceStatus
 from clipper.models import Item, RunWindow
-from clipper.queries import GDELT_LANGS, Query, to_gdelt
+from clipper.queries import GDELT_LANGS, SPECIFIC_PREFIXES, Query, combine, matching_ids, to_gdelt
 
 BASE_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
-TIMEOUT = 60
-PACE_SECONDS = 5.5
-BACKOFFS = (10, 20, 40)  # one retry per entry after a 429
-GDELT_BUDGET_SECONDS = 60  # total time for one collect call
+TIMEOUT = 20               # well under the budget, so one slow answer can't use it all up
+PACE_SECONDS = 5.5         # GDELT allows about one request every 5 seconds
+BACKOFFS = (15,)           # one quick retry after a 429; the search is then retried later in the run
+RETRY_PAUSE_SECONDS = 30   # wait before the late retries
+GDELT_BUDGET_SECONDS = 100  # the minimum: room for a request, a quick retry, the wait and a late retry
+SECONDS_PER_REQUEST = 35
+MAX_BUDGET_SECONDS = 300
+TERMS_PER_REQUEST = 5      # topic and people searches are folded into OR'd requests of this size
 
 _CODE_BY_NAME = {name: code for code, name in GDELT_LANGS.items()}
 
@@ -54,6 +58,7 @@ class GdeltCollector:
         self.progress = progress
         self._requested = False
         self._start = 0.0
+        self._budget = GDELT_BUDGET_SECONDS
 
     def _say(self, message: str) -> None:
         if self.progress:
@@ -62,12 +67,45 @@ class GdeltCollector:
     def _skip(self, q: Query, reason: str) -> SourceStatus:
         return SourceStatus(self.name, q.id, False, 0, reason, None)
 
+    def plan(self, queries: list[Query]) -> list[tuple[Query, list[Query]]]:
+        """The requests to send: subject searches one by one, topic and people searches
+        folded into OR'd requests. Each comes with the searches it stands for."""
+        singles = [q for q in queries if len(q.all_of) != 1 or not q.id.startswith(("programme:", "person:"))]
+        foldable = [q for q in queries if q not in singles]
+        out = [(q, [q]) for q in singles]
+        by_id = {q.id: q for q in foldable}
+        for combined, ids in combine(foldable, TERMS_PER_REQUEST, "topics and people") if foldable else []:
+            out.append((combined, [by_id[i] for i in ids]))
+        return out
+
     def collect(self, queries: list[Query], window: RunWindow) -> tuple[list[Item], list[SourceStatus]]:
         items: list[Item] = []
         statuses: list[SourceStatus] = []
         self._start = self.clock()
+        requests_plan = self.plan(queries)
+        self._budget = min(MAX_BUDGET_SECONDS, max(GDELT_BUDGET_SECONDS, SECONDS_PER_REQUEST * len(requests_plan)))
+        retry: list[tuple[Query, list[Query]]] = []
+        limited = False  # GDELT asked us to slow down: later requests wait for the late retry
         skip_reason: str | None = None  # set once the rest of the run is given up
-        for n, q in enumerate(queries, 1):
+
+        def run(q: Query, members: list[Query]) -> str | None:
+            """Send one request; returns "rate limited" or "budget" when it couldn't run."""
+            try:
+                got = self._fetch(q, window)
+            except RateLimited:
+                return "rate limited"
+            except BudgetExceeded:
+                return "budget"
+            except Exception as e:  # one failing request must not stop the run
+                statuses.append(self._skip(q, str(e)))
+                return None
+            for it in got:  # a folded request: credit the searches the headline really names
+                it.matched_queries = matching_ids(members, it.title) or [m.id for m in members]
+            items.extend(got)
+            statuses.append(SourceStatus(self.name, q.id, True, len(got), None, window.since))
+            return None
+
+        for n, (q, members) in enumerate(requests_plan, 1):
             if skip_reason:
                 statuses.append(self._skip(q, skip_reason))
                 continue
@@ -77,25 +115,31 @@ class GdeltCollector:
             if not to_gdelt(q, self.country, self.languages, self.exclude_domains):
                 statuses.append(self._skip(q, "query not usable for GDELT"))
                 continue
-            try:
-                got = self._fetch(q, window)
-            except RateLimited:
-                skip_reason = "rate limited, skipped"
-                self._say("GDELT: rate limited, skipping remaining queries")
-                statuses.append(self._skip(q, "rate limited"))
+            if limited:
+                retry.append((q, members))
                 continue
-            except BudgetExceeded:
+            outcome = run(q, members)
+            if outcome == "rate limited":
+                limited = True
+                retry.append((q, members))
+                self._say("GDELT: asked to slow down; will retry later in the run")
+            elif outcome == "budget":
                 skip_reason = "time budget exceeded, skipped"
                 self._say("GDELT: time budget used up, skipping remaining queries")
                 statuses.append(self._skip(q, skip_reason))
-                continue
-            except Exception as e:  # one failing query must not stop the run
-                statuses.append(self._skip(q, str(e)))
-                self._say(f"GDELT: {n}/{len(queries)} queries")
-                continue
-            items.extend(got)
-            statuses.append(SourceStatus(self.name, q.id, True, len(got), None, window.since))
-            self._say(f"GDELT: {n}/{len(queries)} queries")
+            self._say(f"GDELT: {n}/{len(requests_plan)} requests")
+
+        if retry and not skip_reason:
+            if self.clock() - self._start + RETRY_PAUSE_SECONDS < self._budget:
+                self.sleep(RETRY_PAUSE_SECONDS)
+            for k, (q, members) in enumerate(retry):
+                outcome = run(q, members)
+                if outcome:
+                    reason = "rate limited" if outcome == "rate limited" else "time budget exceeded"
+                    statuses.extend(self._skip(rq, reason) for rq, _ in retry[k:])
+                    break
+        elif retry:
+            statuses.extend(self._skip(q, skip_reason) for q, _ in retry)
         return items, statuses
 
     def _get(self, params: dict) -> requests.Response:
@@ -104,7 +148,7 @@ class GdeltCollector:
         for delay in delays:
             wait = max(delay, PACE_SECONDS) if delay is not None else (
                 PACE_SECONDS if self._requested else 0)
-            if self.clock() - self._start + wait > GDELT_BUDGET_SECONDS:
+            if self.clock() - self._start + wait > self._budget:
                 raise BudgetExceeded()
             if wait:
                 self.sleep(wait)  # a backoff replaces the pacing sleep

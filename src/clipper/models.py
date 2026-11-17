@@ -63,4 +63,5 @@ class Project:
     social: list[str] = field(default_factory=list)  # platforms watched through Agent Reach
     own_accounts: list[str] = field(default_factory=list)  # the organisation's own handles
     parent_names: list[str] = field(default_factory=list)  # e.g. Aurora Foundation for Aurora Climate Lab
+    aliases: dict[str, list[str]] = field(default_factory=dict)  # topic or person -> other names
     report_groups: dict[str, list[str]] = field(default_factory=dict)  # report heading -> programmes

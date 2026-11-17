@@ -4,7 +4,7 @@ import calendar
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from html import unescape
 from importlib import resources
 from typing import Callable
@@ -16,14 +16,18 @@ import yaml
 from clipper.collectors import SourceStatus
 from clipper.collectors.google_news import GoogleNewsCollector
 from clipper.models import Item, Outlet, RunWindow
-from clipper.queries import Query, matching_ids
+from clipper.queries import Query, combine, matching_ids
 
 USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 TIMEOUT = 15
 FEED_WORKERS = 8           # feeds are fetched in parallel: one slow site no longer holds the run
 SITE_BATCH = 10            # outlets without a usable feed share one site-restricted search
-FALLBACK_BUDGET_SECONDS = 60
+FALLBACK_BUDGET_SECONDS = 60   # the minimum; more batches get more time
+SECONDS_PER_BATCH = 20
+MAX_FALLBACK_SECONDS = 300
+SHALLOW_SLACK = timedelta(days=1)  # a feed reaching back to within a day of the start is deep enough
+TERMS_PER_SEARCH = 8           # older weeks of shallow feeds: all names folded into a few searches
 SNIPPET_MAX = 500
 _TAGS = re.compile(r"<[^>]+>")
 _SPACES = re.compile(r"\s+")
@@ -91,14 +95,56 @@ class OutletFeedsCollector:
 
         rest = [o for o in self.outlets if o.domain not in statuses]
         batches = [rest[i:i + SITE_BATCH] for i in range(0, len(rest), SITE_BATCH)]
+        # Feeds that only reach back a few days: search their older weeks by site.
+        shallow = [o for o in self.outlets if o.domain in statuses and statuses[o.domain].covered_since
+                   and statuses[o.domain].covered_since > window.since + SHALLOW_SLACK]
+        deep_batches = [shallow[i:i + SITE_BATCH] for i in range(0, len(shallow), SITE_BATCH)]
+        budget = min(MAX_FALLBACK_SECONDS,
+                     max(FALLBACK_BUDGET_SECONDS, SECONDS_PER_BATCH * (len(batches) + len(deep_batches))))
         start = self.gnews.clock()
         for n, batch in enumerate(batches, 1):
             self._say(f"Outlets: site search {n}/{len(batches)}")
-            remaining = FALLBACK_BUDGET_SECONDS - (self.gnews.clock() - start)
+            remaining = budget - (self.gnews.clock() - start)
             got, batch_statuses = self._fallback(batch, queries, window, feed_errors, remaining)
             items.extend(got)
             statuses.update(batch_statuses)
+        for n, batch in enumerate(deep_batches, 1):
+            self._say(f"Outlets: older weeks {n}/{len(deep_batches)}")
+            remaining = budget - (self.gnews.clock() - start)
+            got, reached = self._older_weeks(batch, queries, window, statuses, remaining)
+            items.extend(got)
+            for d in reached:
+                old = statuses[d]
+                statuses[d] = SourceStatus(old.source, old.target, old.ok,
+                                           old.items + sum(1 for i in got if i.outlet_domain == d),
+                                           old.error, window.since)
         return items, [statuses[o.domain] for o in self.outlets]
+
+    def _older_weeks(self, batch: list[Outlet], queries: list[Query], window: RunWindow,
+                     statuses: dict[str, SourceStatus], budget: float) -> tuple[list[Item], list[str]]:
+        """Site searches for the part of the window a shallow feed doesn't cover. Every name
+        is folded into a few OR'd searches. Returns the items and the domains now covered."""
+        if budget <= 0:
+            return [], []
+        until = max(statuses[o.domain].covered_since for o in batch)
+        part = RunWindow(window.since, min(until, window.until))
+        foldable = [q for q in queries if len(q.all_of) == 1]
+        folded = [c for c, _ in combine(foldable, TERMS_PER_SEARCH, "older weeks")] if foldable else []
+        domains = [o.domain for o in batch]
+        site = domains[0] if len(domains) == 1 else domains
+        got, results = self.gnews.collect(folded, part, site=site, budget=budget)
+        by_domain = {o.domain: o for o in batch}
+        kept = []
+        for it in got:
+            outlet = by_domain.get(it.outlet_domain) or next(
+                (o for d, o in by_domain.items() if it.outlet_domain.endswith("." + d)), None)
+            if outlet is None:
+                continue
+            it.outlet, it.outlet_domain = outlet.name, outlet.domain
+            it.matched_queries = matching_ids(queries, it.title) or ["subject"]
+            kept.append(it)
+        searched = bool(results) and all(s.ok for s in results)
+        return kept, (domains if searched else [])
 
     def _from_feed(self, outlet: Outlet, queries: list[Query],
                    window: RunWindow) -> tuple[list[Item], datetime]:

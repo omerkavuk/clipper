@@ -66,3 +66,14 @@ def test_results_that_do_not_name_the_search_terms_are_dropped():
     responses.get(BASE_URL, body=noisy)
     items, statuses = make().collect([Q], W)
     assert items == [] and statuses[0].ok
+
+
+@responses.activate
+def test_every_language_and_relevance_order_for_long_windows():
+    responses.get(BASE_URL, body=FEED)
+    long = RunWindow(datetime(2026, 10, 10, tzinfo=timezone.utc), datetime(2026, 11, 14, tzinfo=timezone.utc))
+    items, statuses = BingNewsCollector("IT", ["it", "en"], sleep=lambda s: None).collect([Q], long)
+    params = [{k: v[0] for k, v in parse_qs(urlparse(c.request.url).query).items()} for c in responses.calls]
+    assert [(p["setlang"], "qft" in p) for p in params] == [
+        ("it-IT", True), ("it-IT", False), ("en-IT", True), ("en-IT", False)]
+    assert len(items) == 1 and statuses[0].ok and statuses[0].items == 1

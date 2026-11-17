@@ -13,6 +13,7 @@ URL = "https://news.google.com/rss/search"
 Q = Query("subject", "Subject", [["Aurora"]], [])
 WINDOW = RunWindow(datetime(2026, 10, 14, tzinfo=timezone.utc),
                    datetime(2026, 11, 14, tzinfo=timezone.utc))
+WEEK = RunWindow(datetime(2026, 10, 14, tzinfo=timezone.utc), datetime(2026, 10, 21, tzinfo=timezone.utc))
 
 
 def make(**kw):
@@ -38,10 +39,10 @@ def test_parses_items_in_window():
 @responses.activate
 def test_request_has_dates_and_edition():
     responses.add(responses.GET, URL, body=FEED)
-    make().collect([Q], WINDOW)
+    make().collect([Q], WEEK)
     url = responses.calls[0].request.url
     assert "after%3A2026-10-14" in url or "after:2026-10-14" in url
-    assert "before%3A2026-11-15" in url or "before:2026-11-15" in url
+    assert "before%3A2026-10-22" in url or "before:2026-10-22" in url
     assert "gl=IT" in url
     assert "ceid=IT%3Ait" in url or "ceid=IT:it" in url
 
@@ -60,7 +61,7 @@ def test_blocked_by_google_stops_all_later_searches():
     responses.add(responses.GET, URL, status=503)
     c = make()
     q2 = Query("programme:X", "X", [["X"]], [])
-    _, statuses = c.collect([Q, q2], WINDOW)
+    _, statuses = c.collect([Q, q2], WEEK)
     assert [s.error for s in statuses] == ["blocked by Google", "blocked by Google, skipped"]
     _, later = c.collect([Q], WINDOW, site=["a.it", "b.it"])
     assert later[0].error == "blocked by Google, skipped"
@@ -73,7 +74,7 @@ def test_budget_skips_searches_that_would_run_late():
     ticks = iter([0, 0, 100, 100])
     c = GoogleNewsCollector("IT", "it", [], sleep=lambda s: None, clock=lambda: next(ticks))
     q2 = Query("programme:X", "X", [["X"]], [])
-    _, statuses = c.collect([Q, q2], WINDOW, budget=50)
+    _, statuses = c.collect([Q, q2], WEEK, budget=50)
     assert statuses[0].ok and statuses[1].error == "time budget exceeded, skipped"
     assert len(responses.calls) == 1
 
@@ -114,7 +115,7 @@ def test_pauses_between_queries_only():
     with responses.RequestsMock() as rsps:
         rsps.add(responses.GET, URL, body=FEED)
         rsps.add(responses.GET, URL, body=FEED)
-        c.collect([Q, Query("b", "B", [["x"]], [])], WINDOW)
+        c.collect([Q, Query("b", "B", [["x"]], [])], WEEK)
     assert pauses == [1]
 
 
@@ -150,3 +151,30 @@ def test_unparseable_response_is_failed_status():
     assert items == []
     assert statuses[0].ok is False and statuses[0].covered_since is None
     assert "unparseable response" in statuses[0].error
+
+
+@responses.activate
+def test_long_window_is_searched_week_by_week_in_every_language():
+    from urllib.parse import parse_qs, urlparse
+    responses.add(responses.GET, URL, body=FEED)
+    items, statuses = GoogleNewsCollector("IT", ["it", "en"], [], sleep=lambda s: None).collect([Q], WINDOW)
+    calls = [parse_qs(urlparse(c.request.url).query) for c in responses.calls]
+    assert len(calls) == 10  # 31 days -> 5 weekly slices, in two languages
+    assert {c["hl"][0] for c in calls} == {"it", "en"} and {c["gl"][0] for c in calls} == {"IT"}
+    assert sorted({c["q"][0].split("after:")[1][:10] for c in calls})[:2] == ["2026-10-14", "2026-10-21"]
+    assert len(items) == 2 and statuses[0].ok  # the same articles found again are merged
+
+
+@responses.activate
+def test_topic_searches_also_run_in_the_worldwide_edition():
+    from urllib.parse import parse_qs, urlparse
+    responses.add(responses.GET, URL, body=FEED)
+    prog = Query("programme:X", "X", [["X"]], [])
+    GoogleNewsCollector("IT", "it", [], sleep=lambda s: None, abroad=True).collect([Q, prog], WEEK)
+    editions = [(parse_qs(urlparse(c.request.url).query)["ceid"][0]) for c in responses.calls]
+    assert editions == ["IT:it", "IT:it", "US:en"]  # the bare subject is not searched worldwide
+
+
+def test_consent_cookie_is_sent():
+    c = make()
+    assert c.session.cookies.get("SOCS") and c.session.cookies.get("CONSENT")

@@ -24,7 +24,9 @@ USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 TIMEOUT = 15
 PAUSE_SECONDS = 1.5
-BUDGET_SECONDS = 60
+BUDGET_SECONDS = 60          # for one week in one language; more languages and periods get more
+MAX_BUDGET_SECONDS = 240
+LONG_WINDOW_DAYS = 8         # beyond this, also ask for the most relevant results, not only the newest
 BLOCKED_STATUSES = (429, 503)
 SNIPPET_MAX = 500
 _TAGS = re.compile(r"<[^>]+>")
@@ -51,13 +53,14 @@ def _domain(url: str) -> str:
 class BingNewsCollector:
     name = "bing_news"
 
-    def __init__(self, country: str, language: str,
+    def __init__(self, country: str, language: str | list[str],
                  session: requests.Session | None = None,
                  sleep: Callable[[float], None] = time.sleep,
                  clock: Callable[[], float] = time.monotonic,
                  progress: Callable[[str], None] | None = None):
         self.country = country.upper()
-        self.language = language
+        self.languages = [language] if isinstance(language, str) else list(language) or ["en"]
+        self.language = self.languages[0]
         self.session = session or requests.Session()
         self.sleep = sleep
         self.clock = clock
@@ -65,39 +68,56 @@ class BingNewsCollector:
 
     def collect(self, queries: list[Query], window: RunWindow) -> tuple[list[Item], list[SourceStatus]]:
         items: dict[str, Item] = {}
-        statuses: list[SourceStatus] = []
+        long_window = (window.until - window.since).days >= LONG_WINDOW_DAYS
+        orders = [True, False] if long_window else [True]  # newest first, then most relevant
+        jobs = [(q, lang, newest) for q in queries for lang in self.languages for newest in orders]
+        budget = min(MAX_BUDGET_SECONDS, BUDGET_SECONDS * len(self.languages) * len(orders))
+        tally = {q.id: {"ok": 0, "items": 0, "errors": []} for q in queries}
         start = self.clock()
         blocked = False
-        for n, q in enumerate(queries):
+        for n, (q, lang, newest) in enumerate(jobs):
+            t = tally[q.id]
             if blocked:
-                statuses.append(SourceStatus(self.name, q.id, False, 0, "asked to slow down, skipped", None))
+                t["errors"].append("asked to slow down, skipped")
                 continue
-            if self.clock() - start + (PAUSE_SECONDS if n else 0) > BUDGET_SECONDS:
-                statuses.append(SourceStatus(self.name, q.id, False, 0, "time budget exceeded, skipped", None))
+            if self.clock() - start + (PAUSE_SECONDS if n else 0) > budget:
+                t["errors"].append("time budget exceeded, skipped")
                 continue
             if n:
                 self.sleep(PAUSE_SECONDS)
-            if self.progress:
-                self.progress(f"Bing News: {n + 1}/{len(queries)} queries")
+            if self.progress and (n % 10 == 0 or n == len(jobs) - 1):
+                self.progress(f"Bing News: {n + 1}/{len(jobs)} searches")
             try:
-                got = self._fetch(q, window, queries)
+                got = self._fetch(q, window, queries, lang, newest)
             except _Blocked:
                 blocked = True
-                statuses.append(SourceStatus(self.name, q.id, False, 0, "asked to slow down", None))
+                t["errors"].append("asked to slow down")
                 continue
-            except Exception as e:  # one failing query must not stop the run
-                statuses.append(SourceStatus(self.name, q.id, False, 0, str(e), None))
+            except Exception as e:  # one failing search must not stop the run
+                t["errors"].append(str(e))
                 continue
+            t["ok"] += 1
             for it in got:
                 kept = items.setdefault(it.url, it)
-                if kept is not it and q.id not in kept.matched_queries:
-                    kept.matched_queries.append(q.id)
-            statuses.append(SourceStatus(self.name, q.id, True, len(got), None, window.since))
+                if kept is not it:
+                    kept.matched_queries = list(dict.fromkeys(kept.matched_queries + it.matched_queries))
+                else:
+                    t["items"] += 1
+        statuses = []
+        for q in queries:
+            t = tally[q.id]
+            error = None if t["ok"] else ("; ".join(dict.fromkeys(t["errors"])) or "not searched")
+            statuses.append(SourceStatus(self.name, q.id, bool(t["ok"]), t["items"], error,
+                                         window.since if t["ok"] else None))
         return list(items.values()), statuses
 
-    def _fetch(self, q: Query, window: RunWindow, queries: list[Query]) -> list[Item]:
+    def _fetch(self, q: Query, window: RunWindow, queries: list[Query],
+               language: str | None = None, newest: bool = True) -> list[Item]:
+        language = language or self.language
         params = {"q": to_google_news(q, []), "format": "rss", "cc": self.country,
-                  "setlang": f"{self.language}-{self.country}", "qft": 'sortbydate="1"'}
+                  "setlang": f"{language}-{self.country}"}
+        if newest:
+            params["qft"] = 'sortbydate="1"'
         resp = self.session.get(BASE_URL, params=params, timeout=TIMEOUT,
                                 headers={"User-Agent": USER_AGENT})
         if resp.status_code in BLOCKED_STATUSES:
@@ -127,6 +147,6 @@ class BingNewsCollector:
                 source=self.name, outlet=(e.get("news_source") or "").strip() or domain,
                 outlet_domain=domain, url=link,
                 title=title, published_at=published, collected_at=now, snippet=snippet,
-                language=self.language, matched_queries=matched,
+                language=language, matched_queries=matched,
             ))
         return out

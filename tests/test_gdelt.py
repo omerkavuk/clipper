@@ -75,7 +75,7 @@ def test_429_backoff_then_success():
     responses.add(responses.GET, URL, body=BODY)
     sleeps = []
     items, statuses = make(sleeps).collect([Q], WINDOW)
-    assert sleeps == [10, 20]
+    assert sleeps == [15, 30, 5.5]  # quick retry, wait, then the late retry (paced as usual)
     assert len(items) == 3 and statuses[0].ok
 
 
@@ -85,7 +85,7 @@ def test_429_three_times_gives_failed_status():
         responses.add(responses.GET, URL, status=429)
     sleeps = []
     items, statuses = make(sleeps).collect([Q], WINDOW)
-    assert sleeps == [10, 20, 40]
+    assert sleeps == [15, 30, 5.5, 15]  # quick retry, wait, late retry with its own quick retry
     assert items == []
     assert not statuses[0].ok and statuses[0].error == "rate limited"
     assert statuses[0].covered_since is None
@@ -121,18 +121,17 @@ def test_429_exhaustion_skips_remaining_queries_without_requests():
     Q3 = Query("third", "Third", [["Aurora"], ["Roma"]], [])
     lines = []
     items, statuses = make(progress=lines.append).collect([Q, Q2, Q3], WINDOW)
-    assert len(responses.calls) == 4  # only query 1 made requests
-    assert [s.error for s in statuses] == ["rate limited", "rate limited, skipped",
-                                           "rate limited, skipped"]
+    assert len(responses.calls) == 4  # query 1 twice, then its late retry twice; the others wait
+    assert [s.error for s in statuses] == ["rate limited"] * 3
     assert [s.target for s in statuses] == ["subject", "other", "third"]
     assert not any(s.ok for s in statuses) and items == []
-    assert "GDELT: rate limited, skipping remaining queries" in lines
+    assert "GDELT: asked to slow down; will retry later in the run" in lines
 
 
 @responses.activate
 def test_time_budget_skips_rest():
     responses.add(responses.GET, URL, body=BODY)
-    ticks = iter([0, 10, GDELT_BUDGET_SECONDS + 1, GDELT_BUDGET_SECONDS + 2, 999, 999])
+    ticks = iter([0, 10, 999, 999, 999, 999])
     items, statuses = make(clock=lambda: next(ticks)).collect([Q, Q2, Q2], WINDOW)
     assert len(responses.calls) == 1
     assert statuses[0].ok
@@ -155,4 +154,17 @@ def test_progress_lines_only_with_callback():
     responses.add(responses.GET, URL, body=BODY)
     lines = []
     make(progress=lines.append).collect([Q], WINDOW)
-    assert lines == ["GDELT: 1/1 queries"]
+    assert lines == ["GDELT: 1/1 requests"]
+
+
+@responses.activate
+def test_topic_and_people_searches_are_folded_into_one_request():
+    from urllib.parse import parse_qs, urlparse
+    responses.add(responses.GET, URL, body=BODY)
+    progs = [Query(f"programme:{t}", t, [[t]], []) for t in ("Green Schools", "Solar Villages")]
+    person = Query("person:Giulia Marchetti", "P", [["Giulia Marchetti"]], [])
+    items, statuses = make().collect([Q, *progs, person], WINDOW)
+    assert len(responses.calls) == 2  # the subject, then one OR'd request for the other three
+    folded = parse_qs(urlparse(responses.calls[1].request.url).query)["query"][0]
+    assert '"Green Schools" OR "Solar Villages" OR "Giulia Marchetti"' in folded
+    assert [s.target for s in statuses] == ["subject", "topics and people 1"]

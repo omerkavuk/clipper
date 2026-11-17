@@ -81,8 +81,8 @@ def _default_collectors(project: Project, progress: Callable[[str], None] | None
     unknown = set(skip) - set(SOURCES)
     if unknown:
         raise ValueError(f"unknown source to skip: {', '.join(sorted(unknown))}; use {', '.join(SOURCES)}")
-    gnews = GoogleNewsCollector(project.country, project.languages[0], project.exclude_domains,
-                                progress=progress)
+    gnews = GoogleNewsCollector(project.country, project.languages, project.exclude_domains,
+                                progress=progress, abroad=True)
     if "google_news" in skip:
         gnews.off_reason = "switched off for this run"  # also stops the outlet site searches
     key = brave_key()
@@ -90,7 +90,7 @@ def _default_collectors(project: Project, progress: Callable[[str], None] | None
     chosen = [
         ("outlet", lambda: OutletFeedsCollector(project_outlets(project), gnews, progress=progress)),
         ("google_news", lambda: gnews),
-        ("bing_news", lambda: BingNewsCollector(project.country, project.languages[0], progress=progress)),
+        ("bing_news", lambda: BingNewsCollector(project.country, project.languages, progress=progress)),
         ("brave", lambda: BraveNewsCollector(project.country, project.languages, key,
                                              progress=progress) if key else None),
         ("gdelt", lambda: GdeltCollector(project.country, project.languages, project.exclude_domains,
@@ -178,21 +178,35 @@ def _run(project: Project, store: Store, window: RunWindow, collectors: list[Col
 
 
 def _rank(item: Item) -> tuple:
-    """Sort key: subject matches first, then more distinct queries, then programme or
-    person matches, then newest."""
+    """Sort key: a topic, person or name-plus-context match comes first (a bare name match
+    can be a namesake), then more distinct searches, then a name match, then newest."""
     ids = set(item.matched_queries)
+    specific = any(q.startswith(("programme:", "person:", "subject×")) for q in ids)
+    subject = "subject" in ids
     return (
-        not any(q.startswith("subject") for q in ids),
+        0 if specific and subject else 1 if specific else 2 if subject else 3,
         -len(ids),
-        not any(q.startswith(("programme:", "person:")) for q in ids),
         -item.published_at.timestamp(),
     )
+
+
+MAX_SCALE = 6  # a long backfill gets at most six periods' worth of candidates
+
+
+def scaled_caps(caps: Caps, window_days: float, frequency: str) -> Caps:
+    """The caps are set for one regular period; a longer window gets proportionally more."""
+    periods = max(1, min(MAX_SCALE, -(-int(window_days) // FREQUENCY_DAYS.get(frequency, 7))))
+    return Caps(max_candidates=caps.max_candidates * periods,
+                max_fulltext=caps.max_fulltext * periods,
+                max_report_items=caps.max_report_items)
 
 
 def export_candidates(store: Store, run_id: int, caps: Caps, out: Path, project: Project,
                       fetch=fetch_full_text) -> dict:
     items = store.items(run_id)
     items.sort(key=_rank)
+    run = store.run(run_id)
+    caps = scaled_caps(caps, (run.until - run.since).total_seconds() / 86400, project.frequency)
     chosen = items[:caps.max_candidates]
     truncated = len(items) - len(chosen)
 
@@ -206,7 +220,6 @@ def export_candidates(store: Store, run_id: int, caps: Caps, out: Path, project:
         attempted += 1
         fetched += updated.full_text is not None
 
-    run = store.run(run_id)
     store.clear_pending_tags(run_id)  # a new export starts a new tagging batch
     candidate_ids = [it.id for it in chosen]
     store.merge_run_stats(run_id, {"candidate_ids": candidate_ids, "tagged": not candidate_ids,
@@ -234,5 +247,10 @@ def export_candidates(store: Store, run_id: int, caps: Caps, out: Path, project:
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    return {"exported": len(chosen), "truncated": truncated, "fulltext_attempted": attempted,
-            "fulltext_fetched": fetched, "candidate_ids": candidate_ids}
+    result = {"exported": len(chosen), "truncated": truncated, "fulltext_attempted": attempted,
+              "fulltext_fetched": fetched, "candidate_ids": candidate_ids,
+              "max_candidates": caps.max_candidates}
+    if truncated:
+        result["warning"] = (f"{truncated} collected articles were left out by the candidate limit "
+                             f"({caps.max_candidates}); raise caps.max_candidates to include them")
+    return result

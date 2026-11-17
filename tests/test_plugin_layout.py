@@ -14,7 +14,7 @@ SKILLS = ["setup", "run", "status", "edit"]
 def test_plugin_json():
     data = json.loads((ROOT / ".claude-plugin" / "plugin.json").read_text(encoding="utf-8"))
     assert data["name"] == "clipper"
-    assert data["version"] == "1.2.0"
+    assert data["version"] == "1.3.0"
     assert data["description"]
     assert data["author"]["name"] == "Omer"
     assert data["license"] == "MIT"

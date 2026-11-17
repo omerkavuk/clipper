@@ -52,9 +52,28 @@ def test_resolve_returns_publisher_url():
 
 
 @responses.activate
-def test_resolve_without_signature_returns_none():
+def test_resolve_without_signature_says_why():
     responses.get(PAGE, body="<html>nothing</html>")
-    assert gnews_links.resolve(GURL, requests.Session()) is None
+    with pytest.raises(gnews_links.Unresolved, match="no signature"):
+        gnews_links.resolve(GURL, requests.Session())
+
+
+@responses.activate
+def test_consent_page_is_recognised_and_cookie_sent():
+    responses.get(PAGE, status=302, headers={"Location": "https://consent.google.com/ml?continue=x"})
+    responses.get("https://consent.google.com/ml", body="<html>Before you continue</html>")
+    with pytest.raises(gnews_links.Unresolved, match="consent page"):
+        gnews_links.resolve(GURL, requests.Session())
+    assert "SOCS=" in responses.calls[0].request.headers.get("Cookie", "")
+
+
+@responses.activate
+def test_failed_lookups_are_counted_with_reasons():
+    responses.get(PAGE, body="<html>nothing</html>")
+    fetch_full_text(gitem(), None)
+    stats = fulltext.google_link_stats()
+    assert stats["failed"] == 1 and stats["resolved"] == 0
+    assert stats["reasons"] == {"redirect page had no signature": 1}
 
 
 @responses.activate

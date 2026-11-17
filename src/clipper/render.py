@@ -258,6 +258,14 @@ def render_run_note(store: Store, run_id: int, project: Project, render_stats: d
     if candidates is not None or "truncated" in rs:
         lines.append(f"- Candidates: {candidates if candidates is not None else 'n/a'}"
                      f" · truncated: {rs.get('truncated', 0)}")
+    links = rs.get("google_links") or stats.get("google_links")
+    if links and (links.get("resolved") or links.get("failed")):
+        line = (f"- Google News links traced to the publisher: {links.get('resolved', 0)}"
+                f" · not traced: {links.get('failed', 0)}")
+        reasons = links.get("reasons") or {}
+        if reasons:
+            line += " (" + "; ".join(f"{r}: {n}" for r, n in reasons.items()) + ")"
+        lines.append(line)
     if any(k in rs for k in ("applied", "rejected", "unknown_ids", "unknown")):
         lines.append(f"- Tags applied: {rs.get('applied', 0)} · rejected: {rs.get('rejected', 0)}"
                      f" · unknown: {rs.get('unknown_ids', rs.get('unknown', 0))}")

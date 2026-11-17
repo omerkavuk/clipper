@@ -32,6 +32,15 @@ def _clean(terms: list[str]) -> list[str]:
     return [t for t in terms if t.strip()]
 
 
+def _variants(p: Project, name: str) -> list[str]:
+    """A topic or person with the other names the press uses for it (project `aliases`)."""
+    extra = next((v for k, v in (p.aliases or {}).items() if k.casefold() == name.casefold()), [])
+    return list(dict.fromkeys([name, *_clean(extra if isinstance(extra, list) else [extra])]))
+
+
+SPECIFIC_PREFIXES = ("programme:", "person:", "subject×")
+
+
 def build_queries(p: Project) -> list[Query]:
     ex = _clean(p.exclude_terms)
     subject = _clean(p.subject)
@@ -47,9 +56,27 @@ def build_queries(p: Project) -> list[Query]:
         out.append(Query(name, name, [_clean(terms)], ex))
     # Standalone: baseline coverage was found by event names alone.
     for term in _clean(p.programmes):
-        out.append(Query(f"programme:{term}", f"Programme {term}", [[term]], ex))
+        out.append(Query(f"programme:{term}", f"Programme {term}", [_variants(p, term)], ex))
     for name in spokespeople:
-        out.append(Query(f"person:{name}", f"Person {name}", [[name]], ex))
+        out.append(Query(f"person:{name}", f"Person {name}", [_variants(p, name)], ex))
+    return out
+
+
+def combine(queries: list[Query], size: int, label: str) -> list[tuple[Query, list[str]]]:
+    """Fold single-group queries into OR'd queries of at most `size` terms, to send fewer
+    requests. Returns (combined query, ids of the queries it stands for)."""
+    out: list[tuple[Query, list[str]]] = []
+    terms: list[str] = []
+    ids: list[str] = []
+    for q in queries:
+        group = q.all_of[0]
+        if terms and len(terms) + len(group) > size:
+            out.append((Query(f"{label} {len(out) + 1}", label, [terms], q.exclude), ids))
+            terms, ids = [], []
+        terms = terms + [t for t in group if t not in terms]
+        ids = ids + [q.id]
+    if terms:
+        out.append((Query(f"{label} {len(out) + 1}", label, [terms], queries[0].exclude), ids))
     return out
 
 
