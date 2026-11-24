@@ -94,7 +94,7 @@ def test_setup_reports_english_only_and_windows_quoting():
 def test_setup_is_a_wizard_with_clickable_questions():
     text = (ROOT / "skills" / "setup" / "SKILL.md").read_text(encoding="utf-8")
     assert "question tool" in text and "Never comment between screens" in text
-    for n in range(16):
+    for n in [n for n in range(16) if n != 10]:  # screen 10 (who reads it) was removed: one report for all
         assert f"**Screen {n}:" in text, n
     assert "Social media" in text and "clipper sources" in text
     assert (ROOT / "examples" / "sample-report.md").is_file()

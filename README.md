@@ -167,7 +167,6 @@ Setup asks one question per screen. You answer with a click, and each screen say
 | **Kinds of sources** | National, regional, agencies, broadcasters, trade press, think tanks, institutions |
 | **Social media** | Which platforms to watch |
 | **How often** | Daily, weekly or monthly, or only when you ask |
-| **Who reads it** | You, your team, management, or clients and partners |
 
 Then Clipper builds and checks your source list, tests the searches, shows the cost, and offers to set a schedule. If you already have a project, setup asks whether to update it (your answers are filled in for you) or to start fresh.
 
@@ -235,7 +234,7 @@ Clipper never depends on a single route. If one fails, the others carry on.
 
 | Route | What it does | Cost |
 |---|---|---|
-| **Your source list** | Reads every outlet on your checked list. Outlets without a news feed are searched directly. | Free |
+| **Your source list** | Reads every outlet on your checked list: its news feed for recent days, and its sitemap (the site's own list of articles) for older weeks or when there is no feed. A search fills only what both miss. | Free |
 | **Google News** | Searches your names, topics and people in every language you chose | Free |
 | **Bing News** | A second, independent search, so one blocked route never means an empty report | Free |
 | **GDELT** | A global news database, searched by country | Free |
@@ -332,7 +331,6 @@ report_groups:               # optional: topics that share a heading
 country: IT                  # two-letter country code
 languages: [it, en]
 frequency: weekly            # daily | weekly | monthly
-readers: Management
 report_language: en
 caps:                        # optional limits
   max_candidates: 180
@@ -359,7 +357,7 @@ Any country. You choose the country and the languages its press writes in, and s
 English for now. Searches run in every language you choose, and the original headlines are kept.
 
 **What period does a report cover?**
-Everything since the last report, or any period you ask for.
+Everything since the last report, or any period you ask for. A longer report, such as a month, includes everything already found for those weeks.
 
 **Does it read paywalled articles?**
 No. They're counted and marked "subscribers only".

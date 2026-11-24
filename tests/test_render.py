@@ -406,3 +406,9 @@ def test_social_posts_are_counted_apart_and_unknown_countries_said_so(tmp_path, 
     assert "- **Coverage:** 1 article in 1 outlet" in md
     assert "- **Social media:** 1 post by 1 account." in md
     assert "outlet country unknown for 1 article" in md
+
+
+def test_foreign_outlet_heading_names_its_country(tmp_path, store, p):
+    run, ids = make_run(store, [mk(1, outlet="Kypros News")], [dict(tag(), outlet_country="CY")])
+    render_report(store, run, draft_with(tmp_path, "Fine."), p, tmp_path)
+    assert "**Kypros News (Cyprus)**" in report_md(tmp_path, p)

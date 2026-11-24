@@ -18,7 +18,7 @@ What the user sees, screen by screen. Rules for every screen:
 > - **Think tanks, research centres, government and institutional sites**
 > - **Social media**: LinkedIn, X, Instagram, Facebook, YouTube, Reddit
 >
-> Setup is 10 short questions. At the end I build your source list, test it on last week's news and show you the cost. Nothing runs until you approve it.
+> Setup is 9 short questions. At the end I build your source list, test it on last week's news and show you the cost. Nothing runs until you approve it.
 
 Options: **Start setup** · **What does a report look like?** (shows the example report, then returns here)
 
@@ -96,15 +96,6 @@ Options: **Set it up now** · **Skip these platforms**
 > → Each report covers everything since the last one.
 
 Options: **Weekly, on Monday morning** (default) · **Daily** · **Monthly**.
-
-## Screen 10: Who reads it
-
-> **Who will read the report?**
-> → This sets how long the summary is. Reports are in English for now.
-
-Options: **Just me** · **My team** · **Management** · **Clients or partners**.
-
----
 
 ## Screen 11: Your source list (Clipper works)
 

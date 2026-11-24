@@ -36,14 +36,14 @@ Quote every path. Every command prints one JSON object on standard output; parse
 > - **Think tanks, research centres, government and institutional sites**
 > - **Social media**: LinkedIn, X, Instagram, Facebook, YouTube, Reddit
 >
-> Setup is 10 short questions. At the end I build your source list, test it on last week's news and show you the cost. Nothing runs until you approve it.
+> Setup is 9 short questions. At the end I build your source list, test it on last week's news and show you the cost. Nothing runs until you approve it.
 
 Options: "Start setup" · "What does a report look like?" (show `examples/sample-report.md` from the plugin root, then show Screen 0 again).
 
 **Screen 1: Organisation.** "**Which organisation should I watch?**" → "I'll search for this name, its translations and its acronym in every language you pick." Free text.
 
 **Screen 1b: Existing project (only if one exists).** Right after Screen 1, silently run `clipper projects`. If a project with that name (or a close variant of it) is listed, read its `project.yaml` in the listed `folder`, and if `sources.yaml` exists there, count its outlets. Then ask: "**You already have a Clipper project for {organisation}.**" → "Updating keeps your past reports and history; starting fresh moves the old files into a backup folder." Options: "Update it" · "Start fresh".
-- **Update it** (update mode): go through Screens 2–10 as usual, but take every default from the existing `project.yaml`: pre-tick or pre-fill what is already there (its country, languages, names in `subject`, programmes, spokespeople, contexts, exclusions, social platforms, frequency, readers) and keep its names exactly as written (for example the official full name) rather than generating new ones; you may add suggestions next to them. Do not run `init` in "Build the plan": edit the existing `project.yaml` in place. On Screen 11, if `sources.yaml` exists, first ask "**Keep your {n} sources?**" with options "Keep my list" (skip the research and go straight to the summary screen, using `clipper sources --project "<name>"` for the counts, and run it with `--tiers` only if the kinds of sources changed on Screen 7) · "Rebuild it" (do Screen 11 as usual).
+- **Update it** (update mode): go through Screens 2–9 as usual, but take every default from the existing `project.yaml`: pre-tick or pre-fill what is already there (its country, languages, names in `subject`, programmes, spokespeople, contexts, exclusions, social platforms, frequency, readers) and keep its names exactly as written (for example the official full name) rather than generating new ones; you may add suggestions next to them. Do not run `init` in "Build the plan": edit the existing `project.yaml` in place. On Screen 11, if `sources.yaml` exists, first ask "**Keep your {n} sources?**" with options "Keep my list" (skip the research and go straight to the summary screen, using `clipper sources --project "<name>"` for the counts, and run it with `--tiers` only if the kinds of sources changed on Screen 7) · "Rebuild it" (do Screen 11 as usual).
 - **Start fresh**: carry on as for a new project, and in "Build the plan" add `--replace` to `clipper init`. Do not mention the backup folder unless the user asks.
 
 **Screen 2: Country.** "**Which country's media?**" → "At the end of setup I'll build a list of {country}'s news outlets, think tanks and institutions, and show it to you for approval." Offer up to 3 likely countries as options; the user can type another. Note its two-letter ISO code (FR, KE, BR) yourself; never show codes.
@@ -71,7 +71,7 @@ Store the picks in `social` as `linkedin`, `x`, `instagram`, `facebook`, `youtub
 
 **Screen 9: How often.** "**How often do you want the report?**" → "Each report covers everything since the last one." Options: "Weekly, on Monday morning" (default) · "Daily" · "Monthly".
 
-**Screen 10: Who reads it.** "**Who will read the report?**" → "This sets how long the summary is. Reports are in English for now." Options: "Just me" · "My team" · "Management" · "Clients or partners". Store the answer in `readers`. Always set `report_language` to `en`.
+There is one report format for everyone (figures first, a short summary, then coverage by topic), so setup never asks who reads it or offers other kinds of report. Reports are in English for now. Always set `report_language` to `en` and leave `readers` empty.
 
 ## Build the plan (silent)
 

@@ -314,6 +314,9 @@ def build(d: ReportData, guard=lambda s: s) -> list[Block]:
             return (best[1], -sum(len(u) for u in units), best[2])
 
         for outlet, units in sorted(by_heading.items(), key=order_key):
+            origin = where_from(units[0][0], d.tags[units[0][0].id], p, tiers)
+            if origin not in ("home", "unknown") and len({i.outlet for u in units for i in u}) == 1:
+                outlet = f"{outlet} ({countries.name(origin)})"
             blocks.append(Block("outlet", [Run(outlet, bold=True)]))
             units.sort(key=lambda u: u[0].published_at, reverse=True)
             blocks += [_bullet(u, d, guard) for u in units]
