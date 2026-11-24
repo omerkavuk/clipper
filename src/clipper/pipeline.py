@@ -134,6 +134,11 @@ def collect(project: Project, store: Store, window: RunWindow,
 
 def _collect_locked(project, store, window, collectors) -> int:
     store.close_interrupted_runs()
+    last = store.last_run()
+    skipped = (last.stats or {}).get("social_deferred") if last else None
+    for c in collectors:  # social names skipped last run go first this time
+        if skipped and hasattr(c, "priority_terms"):
+            c.priority_terms = list(skipped)
     run_id = store.start_run(window)
     stats: dict = {"collected": 0, "in_window": 0, "new": 0, "sources_failed": 0, "malformed": 0}
     try:
@@ -182,6 +187,9 @@ def _run(project: Project, store: Store, window: RunWindow, collectors: list[Col
 
     for st in statuses:
         store.add_source_status(run_id, st)
+    deferred = [t for c in collectors for t in getattr(c, "deferred_terms", [])]
+    if deferred:
+        stats["social_deferred"] = list(dict.fromkeys(deferred))
     gaps = [getattr(c, "incomplete_from", None) for c in collectors]
     gaps = [g for g in gaps if g is not None]
     if gaps:  # some languages or weeks could not be searched: the next run goes back for them

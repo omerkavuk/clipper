@@ -107,7 +107,8 @@ def _reason(err: dict) -> str:
     return f"{text} [{code}{'; ' + str(hint) if hint else ''}]" if code else text
 
 
-def plan_terms(queries: list[Query], limit: int = MAX_TERMS) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+def plan_terms(queries: list[Query], limit: int = MAX_TERMS,
+               first: list[str] | None = None) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
     """(term, query id) to search, and the ones left out by the per-platform budget. The budget
     is shared fairly: the main name of every search (organisation, each topic, each person)
     comes before any second spelling, so many aliases can't crowd out the topics."""
@@ -123,6 +124,10 @@ def plan_terms(queries: list[Query], limit: int = MAX_TERMS) -> tuple[list[tuple
                 if key and key not in seen:
                     seen.add(key)
                     order.append((term, q.id))
+    if first:  # names skipped last run go first this time
+        wanted = {" ".join(t.casefold().split()) for t in first}
+        order = ([o for o in order if " ".join(o[0].casefold().split()) in wanted]
+                 + [o for o in order if " ".join(o[0].casefold().split()) not in wanted])
     return order[:limit], order[limit:]
 
 
@@ -141,6 +146,8 @@ class SocialCollector:
         self.platforms = [p for p in platforms if p in ROUTES]
         self.watch = {k: [h.strip().lstrip("@") for h in v if h.strip()]
                       for k, v in (watch_accounts or {}).items()}
+        self.priority_terms: list[str] = []   # set by the pipeline: names skipped last run
+        self.deferred_terms: list[str] = []   # names this run had no budget for
         # The organisation's own posts are not coverage, like its own website.
         handles = [h.strip().lstrip("@").lower() for h in own_accounts or [] if h.strip()]
         self._own = (re.compile(r"/(?:posts/|company/|in/|@)?(?:%s)(?:[_/?#]|$)"
@@ -172,9 +179,12 @@ class SocialCollector:
         statuses: list[SourceStatus] = []
         if platform == "instagram":
             return self._watched(platform, channel, queries, window, start)
-        terms, deferred = plan_terms(queries)
+        terms, deferred = plan_terms(queries, first=self.priority_terms)
+        for term, _ in deferred:
+            if term not in self.deferred_terms:
+                self.deferred_terms.append(term)
         statuses += [SourceStatus(self.name, f"{platform}:{term}", False, 0,
-                                  "not searched this run: search budget used by other names", None)
+                                  "not searched this run (search budget); searched first next run", None)
                      for term, _ in deferred]
         for term, qid in terms:
             target = f"{platform}:{term}"

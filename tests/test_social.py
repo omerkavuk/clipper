@@ -141,3 +141,40 @@ def test_report_scope_names_social_platforms():
     assert _scope(p) == "online media in Italy"
     p.social = ["linkedin", "youtube"]
     assert _scope(p) == "online media in Italy, LinkedIn, YouTube"
+
+
+def test_names_skipped_last_run_are_searched_first_next_run():
+    from clipper.collectors.social import plan_terms
+    many = Query("subject", "S", [[f"Name {n}" for n in range(8)]], [])
+    _, deferred = plan_terms([many, PROG], limit=6)
+    skipped = [t for t, _ in deferred]
+    terms, _ = plan_terms([many, PROG], limit=6, first=skipped)
+    assert [t for t, _ in terms][:len(skipped)] == skipped
+
+
+def test_pipeline_carries_skipped_names_to_the_next_run(tmp_path):
+    from clipper.models import RunWindow
+    from clipper.pipeline import collect
+    from clipper.store import Store
+    from datetime import timedelta
+
+    class FakeSocial:
+        name = "social"
+
+        def __init__(self, defer):
+            self.priority_terms, self.deferred_terms, self.defer = [], [], defer
+
+        def collect(self, queries, window):
+            self.deferred_terms = list(self.defer)
+            return [], []
+
+    with Store(tmp_path / "d.sqlite") as store:
+        from clipper.project import load_project
+        from pathlib import Path
+        proj = load_project(Path(__file__).parent.parent / "examples" / "aurora-climate-lab")
+        first = FakeSocial(["Name 7"])
+        collect(proj, store, WINDOW, [first])
+        second = FakeSocial([])
+        later = RunWindow(WINDOW.until, WINDOW.until + timedelta(days=7))
+        collect(proj, store, later, [second])
+        assert second.priority_terms == ["Name 7"]
