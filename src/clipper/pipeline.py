@@ -11,6 +11,7 @@ from clipper.collectors import Collector, SourceStatus
 from clipper.collectors.gdelt import GdeltCollector
 from clipper.collectors.google_news import GoogleNewsCollector
 from clipper.collectors.outlet_feeds import OutletFeedsCollector
+from clipper.collectors.sitemaps import SitemapReader
 from clipper.collectors.bing_news import BingNewsCollector
 from clipper.collectors.brave import BraveNewsCollector, brave_key
 from clipper.collectors.social import SocialCollector
@@ -88,7 +89,8 @@ def _default_collectors(project: Project, progress: Callable[[str], None] | None
     key = brave_key()
     # Outlet feeds first, so an outlet's own link wins when the same story is deduped.
     chosen = [
-        ("outlet", lambda: OutletFeedsCollector(project_outlets(project), gnews, progress=progress)),
+        ("outlet", lambda: OutletFeedsCollector(project_outlets(project), gnews, progress=progress,
+                                                sitemaps=SitemapReader())),
         ("google_news", lambda: gnews),
         ("bing_news", lambda: BingNewsCollector(project.country, project.languages, progress=progress)),
         ("brave", lambda: BraveNewsCollector(project.country, project.languages, key,
@@ -202,7 +204,7 @@ def scaled_caps(caps: Caps, window_days: float, frequency: str) -> Caps:
 
 
 def export_candidates(store: Store, run_id: int, caps: Caps, out: Path, project: Project,
-                      fetch=fetch_full_text) -> dict:
+                      fetch=fetch_full_text, resolve_links=None) -> dict:
     items = store.items(run_id)
     items.sort(key=_rank)
     run = store.run(run_id)
@@ -211,6 +213,15 @@ def export_candidates(store: Store, run_id: int, caps: Caps, out: Path, project:
     truncated = len(items) - len(chosen)
 
     outlets = {o.domain: o for o in project_outlets(project)}
+    if resolve_links is not None:
+        # Publisher links for every Google News item, in a few batched requests; items whose
+        # full text is not read still get the publisher's link in the report.
+        found = resolve_links([it.url for it in chosen if "news.google.com" in it.url])
+        for n, it in enumerate(chosen):
+            if found.get(it.url) and not it.canonical_url:
+                it.canonical_url = found[it.url]
+                if n >= caps.max_fulltext:
+                    store.update_item(it)
     attempted = fetched = 0
     for n, it in enumerate(chosen[:caps.max_fulltext]):
         updated = fetch(it, outlets.get(it.outlet_domain))

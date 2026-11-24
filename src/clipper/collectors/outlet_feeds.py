@@ -15,6 +15,7 @@ import yaml
 
 from clipper.collectors import SourceStatus
 from clipper.collectors.google_news import GoogleNewsCollector
+from clipper.collectors.sitemaps import SitemapReader
 from clipper.models import Item, Outlet, RunWindow
 from clipper.queries import Query, combine, matching_ids
 
@@ -28,6 +29,8 @@ SECONDS_PER_BATCH = 20
 MAX_FALLBACK_SECONDS = 300
 SHALLOW_SLACK = timedelta(days=1)  # a feed reaching back to within a day of the start is deep enough
 TERMS_PER_SEARCH = 8           # older weeks of shallow feeds: all names folded into a few searches
+SITEMAP_WORKERS = 8
+SITEMAP_BUDGET_SECONDS = 120   # all sitemaps together
 SNIPPET_MAX = 500
 _TAGS = re.compile(r"<[^>]+>")
 _SPACES = re.compile(r"\s+")
@@ -59,8 +62,10 @@ class OutletFeedsCollector:
     def __init__(self, outlets: list[Outlet], gnews: GoogleNewsCollector,
                  session: requests.Session | None = None,
                  sleep: Callable[[float], None] = time.sleep,
-                 progress: Callable[[str], None] | None = None):
+                 progress: Callable[[str], None] | None = None,
+                 sitemaps: SitemapReader | None = None):
         self.progress = progress
+        self.sitemaps = sitemaps  # None: no sitemap step (Google site searches only)
         self.outlets = outlets
         self.gnews = gnews
         self.session = session or requests.Session()
@@ -93,11 +98,17 @@ class OutletFeedsCollector:
             items.extend(got)
             statuses[outlet.domain] = SourceStatus("outlet", outlet.domain, True, len(got), None, covered)
 
+        # Each outlet gets one way in for each part of the period, cheapest first:
+        # 1) its feed (recent days), 2) its sitemap (older weeks, or no feed at all),
+        # 3) a Google site search only where the feed and the sitemap both fall short.
         rest = [o for o in self.outlets if o.domain not in statuses]
-        batches = [rest[i:i + SITE_BATCH] for i in range(0, len(rest), SITE_BATCH)]
-        # Feeds that only reach back a few days: search their older weeks by site.
         shallow = [o for o in self.outlets if o.domain in statuses and statuses[o.domain].covered_since
                    and statuses[o.domain].covered_since > window.since + SHALLOW_SLACK]
+        if self.sitemaps is not None and (rest or shallow):
+            covered = self._from_sitemaps(rest + shallow, queries, window, items, statuses)
+            rest = [o for o in rest if o.domain not in covered]
+            shallow = [o for o in shallow if o.domain not in covered]
+        batches = [rest[i:i + SITE_BATCH] for i in range(0, len(rest), SITE_BATCH)]
         deep_batches = [shallow[i:i + SITE_BATCH] for i in range(0, len(shallow), SITE_BATCH)]
         budget = min(MAX_FALLBACK_SECONDS,
                      max(FALLBACK_BUDGET_SECONDS, SECONDS_PER_BATCH * (len(batches) + len(deep_batches))))
@@ -107,7 +118,11 @@ class OutletFeedsCollector:
             remaining = budget - (self.gnews.clock() - start)
             got, batch_statuses = self._fallback(batch, queries, window, feed_errors, remaining)
             items.extend(got)
-            statuses.update(batch_statuses)
+            for d, st in batch_statuses.items():  # keep anything a partial sitemap already found
+                before = statuses.get(d)
+                extra = before.items if before is not None and before.ok else 0
+                statuses[d] = SourceStatus(st.source, st.target, st.ok, st.items + extra, st.error,
+                                           st.covered_since)
         for n, batch in enumerate(deep_batches, 1):
             self._say(f"Outlets: older weeks {n}/{len(deep_batches)}")
             remaining = budget - (self.gnews.clock() - start)
@@ -119,6 +134,33 @@ class OutletFeedsCollector:
                                            old.items + sum(1 for i in got if i.outlet_domain == d),
                                            old.error, window.since)
         return items, [statuses[o.domain] for o in self.outlets]
+
+    def _from_sitemaps(self, outlets: list[Outlet], queries: list[Query], window: RunWindow,
+                       items: list[Item], statuses: dict[str, SourceStatus]) -> set[str]:
+        """Read the sitemaps of outlets the feeds don't fully cover. Adds what they find and
+        returns the domains whose sitemap reached back to the start of the period."""
+        self._say(f"Outlets: reading {len(outlets)} sitemaps")
+        deadline = self.sitemaps.clock() + SITEMAP_BUDGET_SECONDS
+        with ThreadPoolExecutor(max_workers=SITEMAP_WORKERS) as pool:
+            results = list(pool.map(lambda o: self.sitemaps.read(o, queries, window, deadline), outlets))
+        known = {i.url for i in items}
+        covered: set[str] = set()
+        for outlet, (got, oldest, error) in zip(outlets, results):
+            if error is not None:
+                continue
+            new = [i for i in got if i.url not in known]
+            known.update(i.url for i in new)
+            items.extend(new)
+            reached = oldest is not None and oldest <= window.since + SHALLOW_SLACK
+            before = statuses.get(outlet.domain)
+            count = len(new) + (before.items if before is not None and before.ok else 0)
+            since = window.since if reached else max(oldest or window.until, window.since)
+            if before is not None and before.ok and before.covered_since:
+                since = min(since, before.covered_since)
+            statuses[outlet.domain] = SourceStatus("outlet", outlet.domain, True, count, None, since)
+            if reached:
+                covered.add(outlet.domain)
+        return covered
 
     def _older_weeks(self, batch: list[Outlet], queries: list[Query], window: RunWindow,
                      statuses: dict[str, SourceStatus], budget: float) -> tuple[list[Item], list[str]]:

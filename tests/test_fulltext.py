@@ -114,3 +114,11 @@ def test_undeclared_utf8_page_keeps_accents():
     responses.get(URL, body=body.encode("utf-8"), status=200, content_type="text/html")
     out = fetch_full_text(make_item(), make_outlet())
     assert "città" in out.full_text and "cittÃ" not in out.full_text
+
+
+@responses.activate
+def test_item_with_text_already_is_not_downloaded_again():
+    import dataclasses
+    item = dataclasses.replace(make_item(), full_text="Already read by the sitemap step.")
+    out = fetch_full_text(item, make_outlet())
+    assert out.full_text == "Already read by the sitemap step." and len(responses.calls) == 0

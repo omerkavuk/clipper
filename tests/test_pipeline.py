@@ -248,3 +248,18 @@ def test_long_window_scales_the_cap(store, p, tmp_path):
     stats = export_candidates(store, run_id, Caps(max_candidates=10, max_fulltext=0),
                               tmp_path / "c.json", p, fetch=fake_fetch)
     assert stats["exported"] == 30 and stats["truncated"] == 10 and "warning" in stats
+
+
+def test_google_links_get_publisher_links_even_without_full_text(store, p, tmp_path):
+    g = [dataclasses.replace(mk(n), url=f"https://news.google.com/rss/articles/G{n}") for n in (1, 2)]
+    run_id = collect(p, store, WIN, [FakeOK(g)])
+    asked = []
+
+    def resolve(urls):
+        asked.append(urls)
+        return {u: u.replace("https://news.google.com/rss/articles/", "https://pub.it/") for u in urls}
+
+    export_candidates(store, run_id, Caps(max_fulltext=0), tmp_path / "c.json", p,
+                      fetch=fake_fetch, resolve_links=resolve)
+    assert len(asked) == 1 and len(asked[0]) == 2  # one batched call
+    assert sorted(i.canonical_url for i in store.items(run_id)) == ["https://pub.it/G1", "https://pub.it/G2"]

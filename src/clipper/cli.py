@@ -15,7 +15,7 @@ from clipper import countries, paths, pipeline
 from clipper.collectors.outlet_feeds import load_outlets
 from clipper import sources as src
 from clipper import project as proj
-from clipper.fulltext import fetch_full_text, google_link_stats
+from clipper.fulltext import fetch_full_text, google_link_stats, preresolve
 from clipper.models import Project, RunWindow
 from clipper.render import export_draft_input, render_report, render_run_note
 from clipper.store import Store, _iso
@@ -222,7 +222,7 @@ def cmd_candidates(a) -> dict:
     with _store(p) as store:
         _check_run(store, a.run)
         res = pipeline.export_candidates(store, a.run, pipeline.load_caps(p), Path(a.out), p,
-                                         fetch=fetch_full_text)
+                                         fetch=fetch_full_text, resolve_links=preresolve)
         res["google_links"] = google_link_stats()
         store.merge_run_stats(a.run, {"candidates": res["exported"],
                                       "truncated": res["truncated"],

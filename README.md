@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.3.0" src="https://img.shields.io/badge/version-1.3.0-1a8db3?style=flat-square">
+  <img alt="Version 1.4.0" src="https://img.shields.io/badge/version-1.4.0-1a8db3?style=flat-square">
   <img alt="Status: demo" src="https://img.shields.io/badge/status-demo-e8743b?style=flat-square">
   <img alt="Claude Code plugin" src="https://img.shields.io/badge/Claude%20Code-plugin-0f1b3d?style=flat-square">
   <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-0f1b3d?style=flat-square">

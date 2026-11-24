@@ -6,7 +6,6 @@ text freely is only marked as subscribers only.
 from __future__ import annotations
 
 import dataclasses
-import time
 from urllib.parse import urlsplit
 
 import requests
@@ -27,10 +26,36 @@ BLOCKED_STATUSES = (401, 402, 403)
 GOOGLE_PAUSE_SECONDS = 1.0
 GOOGLE_BUDGET = 200  # links resolved per run at most, so a long list cannot get us blocked
 _google = {"blocked": False, "used": 0, "resolved": 0, "failed": 0, "reasons": {}}  # one command = one run
+_resolved: dict[str, str | None] = {}  # Google link -> publisher link (None: tried, failed)
 
 
 def reset_google_state() -> None:
     _google.update(blocked=False, used=0, resolved=0, failed=0, reasons={})
+    _resolved.clear()
+
+
+def preresolve(urls: list[str], session=None) -> dict[str, str]:
+    """Look up the publisher links behind many Google News links at once (batched).
+    Returns {Google link: publisher link} for the ones that worked; failures are counted."""
+    todo = [u for u in dict.fromkeys(urls) if u not in _resolved and _host(u) == "news.google.com"]
+    if not todo:
+        return {u: _resolved[u] for u in urls if _resolved.get(u)}
+    http = session or requests.Session()
+    results = gnews_links.resolve_many(todo, http, pause=GOOGLE_PAUSE_SECONDS,
+                                       limit=max(0, GOOGLE_BUDGET - _google["used"]))
+    _google["used"] += len(todo)
+    for url, found in results.items():
+        if isinstance(found, str):
+            _resolved[url] = found
+            _google["resolved"] += 1
+        else:
+            _resolved[url] = None
+            if isinstance(found, gnews_links.GoogleBlocked):
+                _google["blocked"] = True
+                _failed("Google asked to slow down")
+            else:
+                _failed(str(found) or type(found).__name__)
+    return {u: _resolved[u] for u in urls if _resolved.get(u)}
 
 
 def google_link_stats() -> dict:
@@ -45,31 +70,11 @@ def _failed(reason: str) -> None:
 
 
 def _publisher_url(url: str, http) -> str | None:
-    """The publisher link behind a Google News link, within this run's limits."""
-    if _google["blocked"]:
-        _failed("Google asked to slow down")
-        return None
-    if _google["used"] >= GOOGLE_BUDGET:
-        _failed("look-up limit for this run reached")
-        return None
-    if _google["used"]:
-        time.sleep(GOOGLE_PAUSE_SECONDS)
-    _google["used"] += 1
-    try:
-        found = gnews_links.resolve(url, http)
-    except gnews_links.GoogleBlocked:
-        _google["blocked"] = True
-        _failed("Google asked to slow down")
-        return None
-    except gnews_links.Unresolved as e:
-        _failed(str(e))
-        return None
-    except Exception as e:  # network trouble: count it, never stop the run
-        _failed(f"network error: {type(e).__name__}")
-        return None
-    if found:
-        _google["resolved"] += 1
-    return found
+    """The publisher link behind a Google News link. There is one look-up path: the batched
+    one (preresolve); a link not looked up yet goes through it on its own."""
+    if url not in _resolved:
+        preresolve([url], http)
+    return _resolved.get(url)
 
 
 def fetch_full_text(item: Item, outlet: Outlet | None, session=None) -> Item:
@@ -77,6 +82,8 @@ def fetch_full_text(item: Item, outlet: Outlet | None, session=None) -> Item:
 
     Never raises: on any failure the item is returned unchanged.
     """
+    if item.full_text:  # already read by the collector that found it: no second download
+        return dataclasses.replace(item)
     try:
         return _fetch(item, outlet, session or requests)
     except Exception:
