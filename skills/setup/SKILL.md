@@ -62,12 +62,12 @@ Options: "Start setup" · "What does a report look like?" (show `examples/sample
 - None
 - LinkedIn: "public posts found through web search; some posts will be missed"
 - X: "needs a one-time login"
-- Instagram: "needs a one-time login"
+- Instagram: "posts from accounts you name (partners, ministries, journalists); needs a one-time login"
 - Facebook: "needs a one-time login"
 - YouTube: "videos that mention you"
 - Reddit: "discussions that mention you"
 
-Store the picks in `social` as `linkedin`, `x`, `instagram`, `facebook`, `youtube`, `reddit`. TikTok cannot be searched by date yet: if the user asks for it, say so in one sentence.
+Store the picks in `social` as `linkedin`, `x`, `instagram`, `facebook`, `youtube`, `reddit`. Instagram can't be searched for posts, only read account by account: if Instagram is picked, ask in one free-text question "**Which Instagram accounts should I watch?**" → "I'll read their recent posts and keep the ones that mention you.", propose a few likely ones (partners, the ministry, local press), and store the handles in `watch_accounts: {instagram: [...]}`. TikTok cannot be searched by date yet: if the user asks for it, say so in one sentence.
 
 **Screen 9: How often.** "**How often do you want the report?**" → "Each report covers everything since the last one." Options: "Weekly, on Monday morning" (default) · "Daily" · "Monthly".
 

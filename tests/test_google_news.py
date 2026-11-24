@@ -62,7 +62,8 @@ def test_blocked_by_google_stops_all_later_searches():
     c = make()
     q2 = Query("programme:X", "X", [["X"]], [])
     _, statuses = c.collect([Q, q2], WEEK)
-    assert [s.error for s in statuses] == ["blocked by Google", "blocked by Google, skipped"]
+    assert [s.error for s in statuses] == ["it, 14 Oct–21 Oct: blocked by Google",
+                                         "it, 14 Oct–21 Oct: blocked by Google, skipped"]
     _, later = c.collect([Q], WINDOW, site=["a.it", "b.it"])
     assert later[0].error == "blocked by Google, skipped"
     assert len(responses.calls) == 1  # one request, then nothing more for the run
@@ -75,7 +76,7 @@ def test_budget_skips_searches_that_would_run_late():
     c = GoogleNewsCollector("IT", "it", [], sleep=lambda s: None, clock=lambda: next(ticks))
     q2 = Query("programme:X", "X", [["X"]], [])
     _, statuses = c.collect([Q, q2], WEEK, budget=50)
-    assert statuses[0].ok and statuses[1].error == "time budget exceeded, skipped"
+    assert statuses[0].ok and statuses[1].error == "it, 14 Oct–21 Oct: time budget exceeded, skipped"
     assert len(responses.calls) == 1
 
 
@@ -178,3 +179,14 @@ def test_topic_searches_also_run_in_the_worldwide_edition():
 def test_consent_cookie_is_sent():
     c = make()
     assert c.session.cookies.get("SOCS") and c.session.cookies.get("CONSENT")
+
+
+@responses.activate
+def test_one_language_working_is_not_called_complete():
+    responses.add(responses.GET, URL, body=FEED)   # Italian works
+    responses.add(responses.GET, URL, status=500)  # English fails
+    c = GoogleNewsCollector("IT", ["it", "en"], [], sleep=lambda s: None)
+    items, statuses = c.collect([Q], WEEK)
+    assert statuses[0].items == len(items)  # what Italian found is kept
+    assert not statuses[0].ok and statuses[0].error.startswith("incomplete: 1 of 2 searches failed (en,")
+    assert c.incomplete_from == WEEK.since  # the next run goes back for it

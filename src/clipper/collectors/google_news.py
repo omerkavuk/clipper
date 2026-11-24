@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 import feedparser
 import requests
 
-from clipper.collectors import SourceStatus
+from clipper.collectors import SourceStatus, summarize_jobs
 from clipper.models import Item, RunWindow
 from clipper.queries import SPECIFIC_PREFIXES, Query, to_google_news
 
@@ -62,6 +62,7 @@ class GoogleNewsCollector:
         self.clock = clock
         self.blocked = False  # set on the first 429/503; shared by every later call
         self.off_reason: str | None = None
+        self.incomplete_from = None  # start of the earliest period a search failed for (retried next run)
         self.country = country.upper()
         self.languages = [language] if isinstance(language, str) else list(language) or ["en"]
         self.language = self.languages[0]  # site searches use the first language only
@@ -140,14 +141,21 @@ class GoogleNewsCollector:
                          max(SEARCH_BUDGET_SECONDS, len(jobs) * SECONDS_PER_REQUEST))
         start = self.clock()
         found: dict[str, Item] = {}
-        per_query: dict[str, dict] = {q.id: {"ok": 0, "items": 0, "errors": []} for q in queries}
+        per_query: dict[str, dict] = {q.id: {"done": [], "failed": [], "items": 0} for q in queries}
+
+        def fail(tally, edition, part, why):
+            label = f"{edition[1]}, {part.since:%d %b}–{part.until:%d %b}"
+            tally["failed"].append((label, why, part.since))
+            if self.incomplete_from is None or part.since < self.incomplete_from:
+                self.incomplete_from = part.since
+
         for n, (q, edition, part) in enumerate(jobs):
             tally = per_query[q.id]
             if self.off_reason or self.blocked:
-                tally["errors"].append(self.off_reason or "blocked by Google, skipped")
+                fail(tally, edition, part, self.off_reason or "blocked by Google, skipped")
                 continue
             if self.clock() - start + (PAUSE_SECONDS if n else 0) > budget:
-                tally["errors"].append("time budget exceeded, skipped")
+                fail(tally, edition, part, "time budget exceeded, skipped")
                 continue
             if n:
                 self.sleep(PAUSE_SECONDS)
@@ -159,24 +167,20 @@ class GoogleNewsCollector:
                 self.blocked = True
                 if self.progress:
                     self.progress("Google News: asked to slow down, skipping remaining searches")
-                tally["errors"].append("blocked by Google")
+                fail(tally, edition, part, "blocked by Google")
                 continue
             except Exception as e:  # one failing search must not stop the run
-                tally["errors"].append(str(e))
+                fail(tally, edition, part, str(e))
                 continue
-            tally["ok"] += 1
+            tally["done"].append(part)
             for it in got:
                 kept = found.setdefault(it.url, it)
                 if kept is not it:
                     kept.matched_queries = list(dict.fromkeys(kept.matched_queries + it.matched_queries))
                 else:
                     tally["items"] += 1
-        statuses = []
-        for q in queries:
-            t = per_query[q.id]
-            error = None if t["ok"] else ("; ".join(dict.fromkeys(t["errors"])) or "not searched")
-            statuses.append(SourceStatus(self.name, q.id, bool(t["ok"]), t["items"], error,
-                                         window.since if t["ok"] else None))
+        statuses = [summarize_jobs(self.name, q.id, per_query[q.id]["done"], per_query[q.id]["failed"],
+                                   per_query[q.id]["items"], window) for q in queries]
         return list(found.values()), statuses
 
     def _fetch(self, q: Query, window: RunWindow, site: str | list[str] | None,

@@ -42,7 +42,8 @@ ROUTES = {
     "reddit": ("reddit", "search", None),
     "linkedin": ("web", "search", "site:linkedin.com/posts"),
     "x": ("twitter", "search", None),
-    "instagram": ("instagram", "search", None),
+    # Instagram's search finds users, not posts: posts come from the accounts the project watches.
+    "instagram": ("instagram", "posts", None),
     "facebook": ("facebook", "search", None),
     "tiktok": ("web", "search", "site:tiktok.com"),
 }
@@ -98,16 +99,35 @@ def _date(value) -> datetime | None:
     return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
 
 
+def _reason(err: dict) -> str:
+    """A plain reason, keeping Agent Reach's own code and hint for whoever fixes it."""
+    code = err.get("code")
+    text = PLAIN_ERRORS.get(code, err.get("message") or "failed")
+    hint = err.get("hint") or err.get("retry_after")
+    return f"{text} [{code}{'; ' + str(hint) if hint else ''}]" if code else text
+
+
+def plan_terms(queries: list[Query], limit: int = MAX_TERMS) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """(term, query id) to search, and the ones left out by the per-platform budget. The budget
+    is shared fairly: the main name of every search (organisation, each topic, each person)
+    comes before any second spelling, so many aliases can't crowd out the topics."""
+    groups = [q for q in queries if len(q.all_of) == 1]  # combined queries are matched locally
+    seen: set[str] = set()
+    order: list[tuple[str, str]] = []
+    depth = max((len(q.all_of[0]) for q in groups), default=0)
+    for level in range(depth):
+        for q in groups:
+            if level < len(q.all_of[0]):
+                term = q.all_of[0][level]
+                key = " ".join(term.casefold().split())
+                if key and key not in seen:
+                    seen.add(key)
+                    order.append((term, q.id))
+    return order[:limit], order[limit:]
+
+
 def search_terms(queries: list[Query]) -> list[tuple[str, str]]:
-    """(term, query id) for standalone searches: subject names, programmes, people."""
-    out: list[tuple[str, str]] = []
-    for q in queries:
-        if len(q.all_of) != 1:  # combined queries are matched locally, not searched
-            continue
-        for term in q.all_of[0]:
-            if term not in [t for t, _ in out]:
-                out.append((term, q.id))
-    return out[:MAX_TERMS]
+    return plan_terms(queries)[0]
 
 
 class SocialCollector:
@@ -116,8 +136,11 @@ class SocialCollector:
     def __init__(self, platforms: list[str], run: Callable[..., dict] = run_reach,
                  progress: Callable[[str], None] | None = None,
                  clock: Callable[[], float] = time.monotonic,
-                 own_accounts: list[str] | None = None):
+                 own_accounts: list[str] | None = None,
+                 watch_accounts: dict[str, list[str]] | None = None):
         self.platforms = [p for p in platforms if p in ROUTES]
+        self.watch = {k: [h.strip().lstrip("@") for h in v if h.strip()]
+                      for k, v in (watch_accounts or {}).items()}
         # The organisation's own posts are not coverage, like its own website.
         handles = [h.strip().lstrip("@").lower() for h in own_accounts or [] if h.strip()]
         self._own = (re.compile(r"/(?:posts/|company/|in/|@)?(?:%s)(?:[_/?#]|$)"
@@ -147,7 +170,13 @@ class SocialCollector:
         channel, action, prefix = ROUTES[platform]
         items: list[Item] = []
         statuses: list[SourceStatus] = []
-        for term, qid in search_terms(queries):
+        if platform == "instagram":
+            return self._watched(platform, channel, queries, window, start)
+        terms, deferred = plan_terms(queries)
+        statuses += [SourceStatus(self.name, f"{platform}:{term}", False, 0,
+                                  "not searched this run: search budget used by other names", None)
+                     for term, _ in deferred]
+        for term, qid in terms:
             target = f"{platform}:{term}"
             if self.clock() - start > BUDGET_SECONDS:
                 statuses.append(SourceStatus(self.name, target, False, 0, "time budget exceeded, skipped", None))
@@ -156,7 +185,7 @@ class SocialCollector:
             out = self.run([channel, action, text, "--limit", str(LIMIT)])
             if not out.get("ok"):
                 err = out.get("error") or {}
-                reason = PLAIN_ERRORS.get(err.get("code"), err.get("message") or "failed")
+                reason = _reason(err)
                 statuses.append(SourceStatus(self.name, target, False, 0, reason, None))
                 if err.get("code") in ("NEED_SETUP", "NEED_LOGIN", "PLATFORM_BLOCKED", "RATE_LIMITED"):
                     break  # the same answer would come back for every term
@@ -166,6 +195,37 @@ class SocialCollector:
                 raw = self._youtube_dates(raw)
             got = [it for it in (self._item(platform, r, queries, qid) for r in raw)
                    if it and window.since <= it.published_at < window.until]
+            items.extend(got)
+            statuses.append(SourceStatus(self.name, target, True, len(got), None, window.since))
+        return items, statuses
+
+    def _watched(self, platform: str, channel: str, queries: list[Query], window: RunWindow,
+                 start: float) -> tuple[list[Item], list[SourceStatus]]:
+        """Recent posts of the accounts the project watches, kept when they name a search term."""
+        accounts = self.watch.get(platform) or []
+        if not accounts:
+            return [], [SourceStatus(self.name, f"{platform}:*", False, 0,
+                                     "Instagram can't be searched for posts; add accounts to watch", None)]
+        items: list[Item] = []
+        statuses: list[SourceStatus] = []
+        for handle in accounts:
+            target = f"{platform}:@{handle}"
+            if self.clock() - start > BUDGET_SECONDS:
+                statuses.append(SourceStatus(self.name, target, False, 0, "time budget exceeded, skipped", None))
+                continue
+            out = self.run([channel, "posts", handle, "--limit", str(LIMIT)])
+            if not out.get("ok"):
+                err = out.get("error") or {}
+                statuses.append(SourceStatus(self.name, target, False, 0, _reason(err), None))
+                if err.get("code") in ("NEED_SETUP", "NEED_LOGIN", "PLATFORM_BLOCKED", "RATE_LIMITED"):
+                    break
+                continue
+            got = []
+            for r in out.get("items") or []:
+                it = self._item(platform, r, queries, "")
+                if it and window.since <= it.published_at < window.until and matching_ids(
+                        queries, f"{it.title} {it.snippet}"):
+                    got.append(it)
             items.extend(got)
             statuses.append(SourceStatus(self.name, target, True, len(got), None, window.since))
         return items, statuses

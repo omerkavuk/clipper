@@ -48,7 +48,7 @@ def test_items_have_publisher_link_outlet_and_window_filter():
 def test_slow_down_stops_later_queries():
     responses.get(BASE_URL, status=429)
     _, statuses = make().collect([Q, Q2], W)
-    assert len(responses.calls) == 1 and statuses[1].error == "asked to slow down, skipped"
+    assert len(responses.calls) == 1 and statuses[1].error == "it, newest: asked to slow down, skipped"
 
 
 def test_bing_is_a_default_source_and_can_be_skipped(example_project):

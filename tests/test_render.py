@@ -1,6 +1,7 @@
 import dataclasses
 import json
 import re
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -58,7 +59,8 @@ def draft_with(tmp_path, text):
 
 
 def report_md(tmp_path, p, date="2026-11-14"):
-    return (tmp_path / "reports" / f"{p.name}-{date}.md").read_text("utf-8")
+    (path,) = (tmp_path / "reports").glob(f"{p.name}-{date}-run*.md")  # exactly one report
+    return path.read_text("utf-8")
 
 
 def test_run_note_lists_failed_outlets(tmp_path, store, p):
@@ -74,12 +76,12 @@ def test_run_note_lists_failed_outlets(tmp_path, store, p):
     stats = {"candidates": 3, "truncated": 0, "applied": 3, "rejected": 1, "unknown_ids": 2,
              "removed_refs": 4, "removed_sentences": []}
     path = render_run_note(store, run, p, stats, tmp_path)
-    assert path == tmp_path / "run-notes" / f"{p.name}-2026-11-14.md"
+    assert path.parent == tmp_path / "run-notes" and path.name.startswith(f"{p.name}-2026-11-14-run")
     note = path.read_text("utf-8")
     assert "Checked 2 of 3 outlets" in note
     assert "agi.it: HTTP 404" in note
-    assert "Google News: 1 of 2 requests ok" in note and "timeout" in note
-    assert "GDELT: 0 of 1 requests ok" in note and "rate limited" in note
+    assert "Google News: 1 of 2 searches complete" in note and "timeout" in note
+    assert "GDELT: 0 of 1 searches complete" in note and "rate limited" in note
     assert "late.it: covered since 2026-11-09" in note
     assert "Items collected: 5 · new: 3 · malformed: 0" in note
     assert "Candidates: 3 · truncated: 0" in note
@@ -87,7 +89,7 @@ def test_run_note_lists_failed_outlets(tmp_path, store, p):
     assert "Citations removed: 4" in note
     assert "no estimate yet" in note
     expected = 3 * TOKENS_PER_TAGGED_ITEM + REPORT_BASE_TOKENS + 2 * TOKENS_PER_REPORT_ITEM + RUN_OVERHEAD_TOKENS
-    assert f"This run (count-based): {expected:,}" in note
+    assert f"This run, estimated from its article counts: {expected:,}" in note
 
 
 def test_run_note_shows_estimate(tmp_path, store, p):
@@ -333,7 +335,7 @@ def test_word_file_has_outlet_style_and_links(tmp_path, store, p):
     from docx.shared import RGBColor
     run, ids = make_run(store, [mk(1, outlet="Comune di Lumio")], [tag(related="Green Schools")])
     stats = render_report(store, run, draft_with(tmp_path, "Fine."), p, tmp_path)
-    assert stats["report_docx"].endswith(f"{p.name}-2026-11-14.docx")
+    assert re.search(rf"{re.escape(p.name)}-2026-11-14-run\d+\.docx$", stats["report_docx"])
     doc = Document(stats["report_docx"])
     styles = [(para.style.name, para.text) for para in doc.paragraphs]
     assert ("Heading 1", "Aurora Climate Lab media coverage") in styles
@@ -351,15 +353,15 @@ def test_filename_with_apostrophe_and_spaces(tmp_path, store, p):
     p = dataclasses.replace(p, name="Sam's Climate Lab")
     run, ids = make_run(store, [mk(1)])
     stats = render_report(store, run, draft_with(tmp_path, "Fine."), p, tmp_path / "out dir")
-    assert (tmp_path / "out dir" / "reports" / "Sam's Climate Lab-2026-11-14.docx").exists()
-    assert stats["report_md"].endswith("Sam's Climate Lab-2026-11-14.md")
+    assert list((tmp_path / "out dir" / "reports").glob("Sam's Climate Lab-2026-11-14-run*.docx"))
+    assert re.search(r"Sam's Climate Lab-2026-11-14-run\d+\.md$", stats["report_md"])
 
 
 def test_file_date_is_last_second_of_window(tmp_path, store, p):
     midnight = datetime(2026, 11, 15, tzinfo=timezone.utc)
     run, ids = make_run(store, [mk(1)], since=SINCE, until=midnight)
     stats = render_report(store, run, draft_with(tmp_path, "Fine."), p, tmp_path)
-    assert stats["report_md"].endswith("-2026-11-14.md")
+    assert re.search(r"-2026-11-14-run\d+\.md$", stats["report_md"])
 
 
 def test_reach_abroad_uses_tagged_country(tmp_path, store, p):
@@ -374,3 +376,33 @@ def test_description_is_one_sentence(tmp_path, store, p):
     render_report(store, run, draft_with(tmp_path, "Fine."), p, tmp_path)
     md = report_md(tmp_path, p)
     assert "- Comune di Lumio awards 50 winners. [Headline" in md and "Based on" not in md
+
+
+def test_reports_for_the_same_end_date_do_not_overwrite_each_other(tmp_path, store, p):
+    week, _ = make_run(store, [mk(1)])
+    month, _ = make_run(store, [mk(2)], since=SINCE - timedelta(days=20))
+    a = render_report(store, week, draft_with(tmp_path, "Fine."), p, tmp_path)
+    b = render_report(store, month, draft_with(tmp_path, "Fine."), p, tmp_path)
+    assert a["report_md"] != b["report_md"] and Path(a["report_md"]).exists()
+
+
+def test_run_note_lists_every_route_with_its_reasons(tmp_path, store, p):
+    run, _ = make_run(store, [mk(1)])
+    store.add_source_status(run, SourceStatus("bing_news", "subject", False, 0, "en, newest: timed out", None))
+    store.add_source_status(run, SourceStatus("social", "x:Aurora", False, 0, "needs you to log in once [NEED_LOGIN]", None))
+    note = render_run_note(store, run, p, {}, tmp_path).read_text("utf-8")
+    assert "Bing News: 0 of 1 searches complete" in note and "en, newest: timed out" in note
+    assert "Social media: 0 of 1 searches complete" in note and "[NEED_LOGIN]" in note
+
+
+def test_social_posts_are_counted_apart_and_unknown_countries_said_so(tmp_path, store, p):
+    social = mk(1, outlet="X · someone")
+    social.source, social.outlet_domain = "social:x", "x.com"
+    press = mk(2, outlet="Some Blog")
+    press.outlet_domain = "someblog.com"
+    run, _ = make_run(store, [social, press])
+    render_report(store, run, draft_with(tmp_path, "Fine."), p, tmp_path)
+    md = report_md(tmp_path, p)
+    assert "- **Coverage:** 1 article in 1 outlet" in md
+    assert "- **Social media:** 1 post by 1 account." in md
+    assert "outlet country unknown for 1 article" in md

@@ -15,7 +15,7 @@ from urllib.parse import parse_qs, urlparse
 import feedparser
 import requests
 
-from clipper.collectors import SourceStatus
+from clipper.collectors import SourceStatus, summarize_jobs
 from clipper.models import Item, RunWindow
 from clipper.queries import Query, matching_ids, to_google_news
 
@@ -61,6 +61,7 @@ class BingNewsCollector:
         self.country = country.upper()
         self.languages = [language] if isinstance(language, str) else list(language) or ["en"]
         self.language = self.languages[0]
+        self.incomplete_from = None  # set when a search failed (retried from here next run)
         self.session = session or requests.Session()
         self.sleep = sleep
         self.clock = clock
@@ -72,16 +73,21 @@ class BingNewsCollector:
         orders = [True, False] if long_window else [True]  # newest first, then most relevant
         jobs = [(q, lang, newest) for q in queries for lang in self.languages for newest in orders]
         budget = min(MAX_BUDGET_SECONDS, BUDGET_SECONDS * len(self.languages) * len(orders))
-        tally = {q.id: {"ok": 0, "items": 0, "errors": []} for q in queries}
+        tally = {q.id: {"done": [], "failed": [], "items": 0} for q in queries}
         start = self.clock()
         blocked = False
+
+        def fail(t, lang, newest, why):
+            t["failed"].append((f"{lang}, {'newest' if newest else 'most relevant'}", why, window.since))
+            self.incomplete_from = window.since
+
         for n, (q, lang, newest) in enumerate(jobs):
             t = tally[q.id]
             if blocked:
-                t["errors"].append("asked to slow down, skipped")
+                fail(t, lang, newest, "asked to slow down, skipped")
                 continue
             if self.clock() - start + (PAUSE_SECONDS if n else 0) > budget:
-                t["errors"].append("time budget exceeded, skipped")
+                fail(t, lang, newest, "time budget exceeded, skipped")
                 continue
             if n:
                 self.sleep(PAUSE_SECONDS)
@@ -91,24 +97,20 @@ class BingNewsCollector:
                 got = self._fetch(q, window, queries, lang, newest)
             except _Blocked:
                 blocked = True
-                t["errors"].append("asked to slow down")
+                fail(t, lang, newest, "asked to slow down")
                 continue
             except Exception as e:  # one failing search must not stop the run
-                t["errors"].append(str(e))
+                fail(t, lang, newest, str(e))
                 continue
-            t["ok"] += 1
+            t["done"].append(lang)
             for it in got:
                 kept = items.setdefault(it.url, it)
                 if kept is not it:
                     kept.matched_queries = list(dict.fromkeys(kept.matched_queries + it.matched_queries))
                 else:
                     t["items"] += 1
-        statuses = []
-        for q in queries:
-            t = tally[q.id]
-            error = None if t["ok"] else ("; ".join(dict.fromkeys(t["errors"])) or "not searched")
-            statuses.append(SourceStatus(self.name, q.id, bool(t["ok"]), t["items"], error,
-                                         window.since if t["ok"] else None))
+        statuses = [summarize_jobs(self.name, q.id, tally[q.id]["done"], tally[q.id]["failed"],
+                                   tally[q.id]["items"], window) for q in queries]
         return list(items.values()), statuses
 
     def _fetch(self, q: Query, window: RunWindow, queries: list[Query],

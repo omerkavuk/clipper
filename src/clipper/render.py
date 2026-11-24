@@ -152,8 +152,8 @@ def render_report(store: Store, run_id: int, draft: Path, project: Project, out_
     date = _file_date(run.until)
     reports = Path(out_dir) / "reports"
     reports.mkdir(parents=True, exist_ok=True)
-    md_path = reports / f"{project.name}-{date}.md"
-    docx_path = reports / f"{project.name}-{date}.docx"
+    md_path = reports / f"{project.name}-{date}-run{run_id}.md"  # run id: no report overwrites another
+    docx_path = reports / f"{project.name}-{date}-run{run_id}.docx"
     md_path.write_text(layout.to_markdown(blocks), encoding="utf-8")
     layout.to_docx(blocks, docx_path)
     return {"report_md": str(md_path), "report_docx": str(docx_path),
@@ -218,7 +218,7 @@ def export_draft_input(store: Store, run_id: int, project: Project, caps: Caps, 
 
 def _source_line(label: str, statuses: list) -> str:
     ok = sum(1 for s in statuses if s.ok)
-    line = f"- {label}: {ok} of {len(statuses)} requests ok"
+    line = f"- {label}: {ok} of {len(statuses)} searches complete"
     failed = [f"{s.target} ({s.error})" for s in statuses if not s.ok]
     if failed:
         line += f"; failed: {', '.join(failed)}"
@@ -243,8 +243,11 @@ def render_run_note(store: Store, run_id: int, project: Project, render_stats: d
     if not_reached:
         lines.append("- Outlets not reached:")
         lines += [f"  - {s.target}: {s.error}" for s in not_reached]
-    lines.append(_source_line("Google News", [s for s in statuses if s.source == "google_news"]))
-    lines.append(_source_line("GDELT", [s for s in statuses if s.source == "gdelt"]))
+    # Every other route, including ones added later: nothing collected is left out of the note.
+    labels = {"google_news": "Google News", "bing_news": "Bing News", "brave": "Brave News",
+              "gdelt": "GDELT", "social": "Social media", "telegram": "Telegram"}
+    for source in dict.fromkeys(s.source for s in statuses if s.source != "outlet"):
+        lines.append(_source_line(labels.get(source, source), [s for s in statuses if s.source == source]))
     late = [s for s in statuses if s.covered_since and s.covered_since > run.since]
     if late:
         lines.append("- Sources that only cover part of the window:")
@@ -286,10 +289,10 @@ def render_run_note(store: Store, run_id: int, project: Project, render_stats: d
     per_run = (project.estimate or {}).get("per_run")
     estimated = f"{per_run:,}" if per_run is not None else "no estimate yet"
     lines += ["", "## Usage", "",
-              f"- Estimated tokens per run: {estimated} · This run (count-based): {tokens:,}"]
+              f"- Estimated tokens per run: {estimated} · This run, estimated from its article counts: {tokens:,}"]
 
     notes = Path(out_dir) / "run-notes"
     notes.mkdir(parents=True, exist_ok=True)
-    path = notes / f"{project.name}-{_file_date(run.until)}.md"
+    path = notes / f"{project.name}-{_file_date(run.until)}-run{run_id}.md"
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path

@@ -36,21 +36,21 @@ def reported(store, run_id, status="ok"):
     store.mark_reported(run_id)
 
 
-def test_duplicates_skipped_across_reported_overlapping_runs(store):
+def test_same_window_again_keeps_its_articles_without_storing_them_twice(store):
     r1 = store.start_run(window())
     store.add_items(r1, [item()])
     reported(store, r1)
     r2 = store.start_run(window())  # same window again
-    assert store.add_items(r2, [item(url="https://www.a.it/x/")]) == []
-    assert store.items(r2) == []
+    assert store.add_items(r2, [item(url="https://www.a.it/x/")]) == []  # nothing new
+    assert [i.url for i in store.items(r2)] == [i.url for i in store.items(r1)]  # but still in the report
 
 
-def test_rerunning_unreported_window_still_stores_items(store):
+def test_rerunning_unreported_window_includes_its_items(store):
     r1 = store.start_run(window())
     store.add_items(r1, [item()])
     store.finish_run(r1, "ok", {})  # collected, never rendered
     r2 = store.start_run(window())
-    assert len(store.add_items(r2, [item()])) == 1
+    assert store.add_items(r2, [item()]) == []
     assert len(store.items(r2)) == 1
 
 
@@ -62,12 +62,15 @@ def test_rerunning_reported_overlapping_window_dedupes(store):
     assert store.add_items(r2, [item()]) == []
 
 
-def test_reported_disjoint_window_does_not_dedupe(store):
-    r1 = store.start_run(window(-1))
-    store.add_items(r1, [item()])
-    reported(store, r1)
-    r2 = store.start_run(window())
-    assert len(store.add_items(r2, [item()])) == 1
+def test_monthly_window_holds_the_articles_of_earlier_weekly_reports(store):
+    week = store.start_run(window())
+    store.add_items(week, [item()])
+    reported(store, week)
+    month = store.start_run(RunWindow(since=T0 - timedelta(days=20), until=T0 + timedelta(days=10)))
+    assert store.add_items(month, []) == []  # the feed no longer lists the old article
+    assert store.attach_window(month) == 1
+    assert [i.url for i in store.items(month)] == ["https://a.it/x"]
+    assert len(store.items(week)) == 1  # the weekly report keeps it too
 
 
 def test_unrendered_run_does_not_advance_last_successful_until(store):
@@ -148,7 +151,7 @@ def test_google_copy_skipped_in_batch_and_in_later_run(store):
     reported(store, r1)
     r2 = store.start_run(window())
     assert store.add_items(r2, [item("Clima, premiati 40 studenti", "https://news.google.com/rss/articles/zzz")]) == []
-    assert len(store.items(r1)) == 1 and store.items(r2) == []
+    assert [i.url for i in store.items(r2)] == ["https://a.it/clima"]  # the original, once
 
 
 def test_reprints_from_n_outlets_plus_google_copy_make_one_story(store):
@@ -222,3 +225,22 @@ def test_interrupted_runs_are_closed_as_failed(store):
     assert store.run(stuck).stats["error"] == "interrupted before it finished"
     assert store.run(done).status == "ok"
     assert store.close_interrupted_runs() == 0
+
+
+def test_a_new_tagging_batch_replaces_the_old_one(store):
+    r = store.start_run(window())
+    a, b = store.add_items(r, [item("A story", "https://a.it/1"), item("B story", "https://b.it/2", "b.it")])
+    store.add_pending_tags(r, {a: {"relevant": True}, b: {"relevant": True}})
+    store.commit_pending_tags(r, [a, b])
+    store.add_pending_tags(r, {a: {"relevant": False}})  # a smaller batch later
+    store.commit_pending_tags(r, [a])
+    assert store.tags(r) == {a: {"relevant": False}}  # b's old tag is gone
+
+
+def test_status_does_not_fail_a_collect_that_is_still_running(store):
+    import os
+    r = store.start_run(window())
+    store.lock_path.write_text(f"{os.getpid()}\n", encoding="utf-8")  # this process: alive
+    assert store.close_interrupted_runs() == 0 and store.run(r).status == "running"
+    store.lock_path.write_text("999999999\n", encoding="utf-8")  # a process that is gone
+    assert store.close_interrupted_runs() == 1 and store.run(r).status == "failed"

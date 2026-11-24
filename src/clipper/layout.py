@@ -110,6 +110,23 @@ def _lookup(domain: str, table: dict[str, str]) -> str | None:
     return None
 
 
+def where_from(item: Item, tags: dict, project: Project, listed: dict[str, str]) -> str:
+    """"home", a foreign country code, or "unknown": a .com outlet nobody placed is not proof
+    that it is domestic."""
+    domain = _domain(item.outlet_domain or item.url)
+    if domain and _lookup(domain, listed):
+        return "home"
+    tagged = str(tags.get("outlet_country") or "").upper()
+    if tagged and countries.is_known(tagged):
+        return "home" if tagged == project.country else tagged
+    tld = domain.rsplit(".", 1)[-1] if domain else ""
+    if len(tld) == 2 and tld not in GENERIC_CCTLDS:
+        code = TLD_EXCEPTIONS.get(tld, tld.upper())
+        if countries.is_known(code):
+            return "home" if code == project.country else code
+    return "unknown"
+
+
 def foreign_country(item: Item, tags: dict, project: Project, listed: dict[str, str]) -> str | None:
     """The other country an outlet belongs to (from the tagger, else its country-code domain)."""
     domain = _domain(item.outlet_domain or item.url)
@@ -155,48 +172,59 @@ def _at_a_glance(d: ReportData, relevant: list[Item], group_counts: list[tuple[s
                  tiers: dict[str, str]) -> list[Block]:
     p, tags = d.project, d.tags
     n = len(relevant)
-    outlets = {i.outlet for i in relevant}
+    # Social posts are mentions, not publisher articles: they are counted on their own line.
+    social = [i for i in relevant if (i.source or "").startswith("social:")]
+    press = [i for i in relevant if i not in social]
+    word = "mention" if social else "article"
+    outlets = {i.outlet for i in press}
     out: list[Block] = []
 
     def bullet(label: str, text: str) -> None:
         out.append(Block("bullet", [Run(f"{label}: ", bold=True), Run(text)]))
 
-    bullet("Coverage", f"{_plural(n, 'article')} in {_plural(len(outlets), 'outlet')} between "
+    bullet("Coverage", f"{_plural(len(press), 'article')} in {_plural(len(outlets), 'outlet')} between "
                        f"{_long_day(d.since)} and {_long_day(d.last_day)}.")
+    if social:
+        accounts = {i.outlet for i in social}
+        bullet("Social media", f"{_plural(len(social), 'post')} by {_plural(len(accounts), 'account')}.")
     tone = Counter(tags[i.id].get("tone") for i in relevant)
     bullet("Tone", f"{tone['positive']} positive, {tone['neutral']} neutral, {tone['negative']} negative.")
     top_name, top_n = max(group_counts, key=lambda g: g[1]) if group_counts else ("", 0)
     if top_n and top_name != group_counts[-1][0]:  # the last group is "other coverage"
-        bullet(top_name, f"{top_n} of the {_plural(n, 'article')}.")
+        bullet(top_name, f"{top_n} of the {_plural(n, word)}.")
     named = sum(1 for i in relevant if tags[i.id].get("naming") == "explicit")
     parent = sum(1 for i in relevant if tags[i.id].get("naming") == "parent_only")
-    text = f"{named} of the {_plural(n, 'article')}."
+    text = f"{named} of the {_plural(n, word)}."
     if parent:
-        text = f"{named} of the {_plural(n, 'article')}; {parent} more name only {p.parent_names[0] if p.parent_names else 'its parent body'}."
+        text = f"{named} of the {_plural(n, word)}; {parent} more name only {p.parent_names[0] if p.parent_names else 'its parent body'}."
     bullet(f"{p.organisation} named directly", text)
-    prominent = [i for i in relevant if _lookup(_domain(i.outlet_domain or i.url), tiers) in PROFILE_TIERS]
+    prominent = [i for i in press if _lookup(_domain(i.outlet_domain or i.url), tiers) in PROFILE_TIERS]
     if prominent:
         best = min(prominent, key=lambda i: _rank_key(i, tags, tiers))
         out.append(Block("bullet", [Run("Highest-profile coverage: ", bold=True), Run(f"{best.outlet}, "),
                                     Run(" ".join(best.title.split()), url=item_link(best)),
                                     Run(f" ({_day(best.published_at)}).")]))
-    inst = [i for i in relevant if tags[i.id].get("type") == "institutional"]
-    news = n - len(inst)
+    inst = [i for i in press if tags[i.id].get("type") == "institutional"]
+    news = len(press) - len(inst)
     text = f"{_plural(news, 'news article')}; {len(inst)} from institutions"
     if inst:
         top, c = Counter(i.outlet for i in inst).most_common(1)[0]
         if c >= 2:
             text += f", {c} of them from {top}"
     bullet("Who published", text + ".")
-    listed = tiers
-    abroad = Counter(c for c in (foreign_country(i, tags[i.id], p, listed) for i in relevant) if c)
+    origin = Counter(where_from(i, tags[i.id], p, tiers) for i in press)
+    abroad = Counter({c: k for c, k in origin.items() if c not in ("home", "unknown")})
+    unknown = origin.get("unknown", 0)
     if abroad:
         where = ", ".join(countries.name(c) for c, _ in abroad.most_common())
-        bullet("Reach abroad", f"{_plural(sum(abroad.values()), 'article')} ({where}).")
+        text = f"{_plural(sum(abroad.values()), 'article')} ({where})"
     else:
-        bullet("Reach abroad", f"no articles from outlets outside {countries.in_country(p.country)}.")
+        text = f"none confirmed from outlets outside {countries.in_country(p.country)}"
+    if unknown:
+        text += f"; outlet country unknown for {_plural(unknown, 'article')}"
+    bullet("Reach abroad", text + ".")
     if d.previous_relevant is not None:
-        bullet("Compared with last period", f"{_plural(n, 'article')}, against {d.previous_relevant} "
+        bullet("Compared with last period", f"{_plural(n, word)}, against {d.previous_relevant} "
                                              f"in the previous report.")
     return out
 

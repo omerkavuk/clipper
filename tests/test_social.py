@@ -28,10 +28,32 @@ def post(url, date, text="Aurora Climate Lab at COP31", author="someone"):
     return {"url": url, "title": "", "text": text, "author": author, "published_at": date}
 
 
-def test_search_terms_skip_combined_queries_and_cap():
+def test_search_terms_skip_combined_queries_and_put_each_main_name_first():
     assert search_terms([SUBJECT, COMBINED, PROG]) == [
-        ("Aurora Climate Lab", "subject"), ("Laboratorio Clima Aurora", "subject"),
-        ("Green Schools", "programme:Green Schools")]
+        ("Aurora Climate Lab", "subject"), ("Green Schools", "programme:Green Schools"),
+        ("Laboratorio Clima Aurora", "subject")]
+
+
+def test_many_aliases_cannot_crowd_out_a_topic_and_left_outs_are_recorded():
+    from clipper.collectors.social import plan_terms
+    many = Query("subject", "S", [[f"Name {n}" for n in range(8)]], [])
+    terms, deferred = plan_terms([many, PROG], limit=6)
+    assert ("Green Schools", "programme:Green Schools") in terms and len(deferred) == 3
+    fake = FakeReach({"web": {"ok": True, "items": []}})
+    _, statuses = SocialCollector(["linkedin"], run=fake).collect([many, PROG], WINDOW)
+    assert sum(1 for s in statuses if s.error and "search budget" in s.error) == 3
+
+
+def test_instagram_reads_watched_accounts_not_user_search():
+    fake = FakeReach({"instagram": {"ok": True, "items": [
+        post("https://www.instagram.com/p/1", "2026-11-10T00:00:00Z", text="Green Schools in Lumio"),
+        post("https://www.instagram.com/p/2", "2026-11-10T00:00:00Z", text="Holiday photos")]}})
+    items, statuses = SocialCollector(["instagram"], run=fake,
+                                      watch_accounts={"instagram": ["@comunedilumio"]}).collect([SUBJECT, PROG], WINDOW)
+    assert fake.calls[0][:3] == ["instagram", "posts", "comunedilumio"]
+    assert [i.url for i in items] == ["https://www.instagram.com/p/1"]  # only posts naming a search term
+    _, none = SocialCollector(["instagram"], run=fake).collect([SUBJECT], WINDOW)
+    assert not none[0].ok and "add accounts to watch" in none[0].error
 
 
 def test_linkedin_goes_through_site_search_and_keeps_dated_posts_in_window():
@@ -52,7 +74,7 @@ def test_login_needed_stops_that_platform_with_plain_reason():
     fake = FakeReach({"twitter": {"ok": False, "items": [], "error": {"code": "NEED_LOGIN"}}})
     items, statuses = SocialCollector(["x"], run=fake).collect([SUBJECT, PROG], WINDOW)
     assert items == [] and len(fake.calls) == 1
-    assert statuses[0].error == "needs you to log in once"
+    assert statuses[0].error == "needs you to log in once [NEED_LOGIN]"
 
 
 def test_youtube_results_are_read_for_their_date():

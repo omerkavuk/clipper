@@ -51,8 +51,9 @@ def test_slug_text():
 @responses.activate
 def test_reads_only_the_months_in_the_window_and_matches_titles_and_addresses():
     register()
-    items, oldest, error = SitemapReader().read(OUTLET, Q, WINDOW, deadline=float("inf"))
-    assert error is None and oldest == datetime(2026, 9, 30, tzinfo=timezone.utc)
+    res = SitemapReader().read(OUTLET, Q, WINDOW, deadline=float("inf"))
+    items, oldest, error = res.items, res.oldest, res.error
+    assert error is None and res.complete and oldest == datetime(2026, 9, 30, tzinfo=timezone.utc)
     by_url = {i.url: i for i in items}
     assert set(by_url) == {"https://notizie.example/cronaca/green-schools-premiati-a-roma-123",
                            "https://notizie.example/2026/10/12/aurora-climate-lab-apre-a-milano/"}
@@ -71,8 +72,8 @@ def test_site_without_sitemap_says_so():
     responses.get(SITE + "/robots.txt", status=404)
     for guess in ("/sitemap.xml", "/sitemap_index.xml", "/news-sitemap.xml", "/sitemap-news.xml"):
         responses.get(SITE + guess, status=404)
-    items, oldest, error = SitemapReader().read(OUTLET, Q, WINDOW, deadline=float("inf"))
-    assert items == [] and error == "no sitemap found"
+    res = SitemapReader().read(OUTLET, Q, WINDOW, deadline=float("inf"))
+    assert res.items == [] and res.error == "no sitemap found" and not res.complete
 
 
 @responses.activate
@@ -108,7 +109,7 @@ def test_list_pages_are_not_articles():
 
 
 @responses.activate
-def test_tag_sitemaps_are_skipped_and_newest_files_read_first():
+def test_tag_sitemaps_and_files_older_than_the_period_are_skipped():
     index = """<?xml version="1.0"?><sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 <sitemap><loc>https://notizie.example/post-sitemap.xml</loc><lastmod>2026-10-01</lastmod></sitemap>
 <sitemap><loc>https://notizie.example/post-sitemap9.xml</loc><lastmod>2026-11-13</lastmod></sitemap>
@@ -121,8 +122,63 @@ def test_tag_sitemaps_are_skipped_and_newest_files_read_first():
     responses.get(SITE + "/sitemap_index.xml", body=index)
     responses.get(SITE + "/post-sitemap9.xml", body=newest)
     responses.get(SITE + "/2026/11/01/green-schools-a-roma/", body="<title>Green Schools a Roma</title>")
-    items, oldest, error = SitemapReader().read(OUTLET, Q, WINDOW, deadline=float("inf"))
+    res = SitemapReader().read(OUTLET, Q, WINDOW, deadline=float("inf"))
     fetched = [c.request.url for c in responses.calls]
     assert SITE + "/post_tag-sitemap.xml" not in fetched
-    assert SITE + "/post-sitemap.xml" not in fetched  # the newest file already reached the start
-    assert [i.title for i in items] == ["Green Schools a Roma"] and error is None
+    assert SITE + "/post-sitemap.xml" not in fetched  # last changed before the period
+    assert [i.title for i in res.items] == ["Green Schools a Roma"] and res.error is None
+
+
+@responses.activate
+def test_a_second_shard_for_the_same_period_is_read_too():
+    index = """<?xml version="1.0"?><sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<sitemap><loc>https://notizie.example/news-a.xml</loc><lastmod>2026-11-13</lastmod></sitemap>
+<sitemap><loc>https://notizie.example/news-b.xml</loc><lastmod>2026-11-13</lastmod></sitemap>
+</sitemapindex>"""
+    shard_a = """<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url><loc>https://notizie.example/2026/11/13/meteo-di-oggi-a-roma/</loc></url>
+<url><loc>https://notizie.example/2026/10/01/calcio-risultati-della-giornata/</loc></url></urlset>"""
+    shard_b = """<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<url><loc>https://notizie.example/2026/10/20/green-schools-premiati-a-roma/</loc></url></urlset>"""
+    responses.get(SITE + "/robots.txt", body=ROBOTS)
+    responses.get(SITE + "/sitemap_index.xml", body=index)
+    responses.get(SITE + "/news-a.xml", body=shard_a)
+    responses.get(SITE + "/news-b.xml", body=shard_b)
+    responses.get(SITE + "/2026/10/20/green-schools-premiati-a-roma/", body="<title>Green Schools premiati</title>")
+    res = SitemapReader().read(OUTLET, Q, WINDOW, deadline=float("inf"))
+    assert [i.title for i in res.items] == ["Green Schools premiati"] and res.complete
+
+
+@responses.activate
+def test_a_missing_shard_means_not_covered_so_google_still_searches():
+    responses.get(SITE + "/robots.txt", body=ROBOTS)
+    responses.get(SITE + "/sitemap_index.xml", body=INDEX)
+    responses.get(SITE + "/sitemap-2026-11.xml", body=NOV)
+    responses.get(SITE + "/sitemap-2026-10.xml", status=500)  # one month's file fails
+    responses.get("https://news.google.com/rss/search", body="<rss><channel></channel></rss>")
+    res = SitemapReader().read(OUTLET, Q, WINDOW, deadline=float("inf"))
+    assert not res.complete and len(res.items) == 1  # November's article is kept
+    gn = GoogleNewsCollector("IT", "it", [], sleep=lambda s: None)
+    OutletFeedsCollector([OUTLET], gn, sleep=lambda s: None, sitemaps=SitemapReader()).collect(Q, WINDOW)
+    assert any("news.google.com" in c.request.url for c in responses.calls)
+
+
+def test_a_sitemap_crash_keeps_the_feed_results():
+    from clipper.collectors.sitemaps import SitemapReader as R
+
+    class Exploding(R):
+        def read(self, *a, **k):
+            raise TimeoutError("time budget exceeded")
+
+    feed = """<?xml version="1.0"?><rss version="2.0"><channel><title>x</title>
+<item><title>Aurora Climate Lab oggi</title><link>https://feed.example/a</link>
+<pubDate>Thu, 12 Nov 2026 10:00:00 GMT</pubDate></item></channel></rss>"""
+    with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+        rsps.get("https://feed.example/rss", body=feed)
+        rsps.get("https://news.google.com/rss/search", body="<rss><channel></channel></rss>")
+        shallow = Outlet("Feed", "feed.example", "https://feed.example/rss", "national", None, False)
+        gn = GoogleNewsCollector("IT", "it", [], sleep=lambda s: None)
+        items, statuses = OutletFeedsCollector([shallow, OUTLET], gn, sleep=lambda s: None,
+                                               sitemaps=Exploding()).collect(Q, WINDOW)
+    assert [i.url for i in items if i.source == "outlet_feed"] == ["https://feed.example/a"]
+    assert len(statuses) == 2

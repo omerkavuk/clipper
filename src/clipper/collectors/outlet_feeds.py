@@ -15,7 +15,7 @@ import yaml
 
 from clipper.collectors import SourceStatus
 from clipper.collectors.google_news import GoogleNewsCollector
-from clipper.collectors.sitemaps import SitemapReader
+from clipper.collectors.sitemaps import SitemapReader, SitemapResult
 from clipper.models import Item, Outlet, RunWindow
 from clipper.queries import Query, combine, matching_ids
 
@@ -141,17 +141,26 @@ class OutletFeedsCollector:
         returns the domains whose sitemap reached back to the start of the period."""
         self._say(f"Outlets: reading {len(outlets)} sitemaps")
         deadline = self.sitemaps.clock() + SITEMAP_BUDGET_SECONDS
+        def safe_read(outlet: Outlet) -> SitemapResult:
+            try:
+                return self.sitemaps.read(outlet, queries, window, deadline)
+            except Exception as e:  # one outlet never takes the others (or the feeds) down
+                return SitemapResult([], None, f"sitemap failed: {type(e).__name__}", False)
+
         with ThreadPoolExecutor(max_workers=SITEMAP_WORKERS) as pool:
-            results = list(pool.map(lambda o: self.sitemaps.read(o, queries, window, deadline), outlets))
+            results = list(pool.map(safe_read, outlets))
         known = {i.url for i in items}
         covered: set[str] = set()
-        for outlet, (got, oldest, error) in zip(outlets, results):
-            if error is not None:
+        for outlet, res in zip(outlets, results):
+            if res.error is not None:
                 continue
-            new = [i for i in got if i.url not in known]
+            new = [i for i in res.items if i.url not in known]
             known.update(i.url for i in new)
             items.extend(new)
-            reached = oldest is not None and oldest <= window.since + SHALLOW_SLACK
+            oldest = res.oldest
+            # Covered only when every relevant file was read and they reach back to the start:
+            # an earliest date alone doesn't prove every article in between was listed.
+            reached = res.complete and oldest is not None and oldest <= window.since + SHALLOW_SLACK
             before = statuses.get(outlet.domain)
             count = len(new) + (before.items if before is not None and before.ok else 0)
             since = window.since if reached else max(oldest or window.until, window.since)

@@ -13,7 +13,7 @@ OPTIONAL = ("estimate", "caps")
 LIST_FIELDS = ("subject", "exclude_terms", "exclude_domains", "programmes", "spokespeople", "languages",
                "social", "own_accounts", "parent_names")
 SOCIAL_PLATFORMS = ("x", "linkedin", "instagram", "facebook", "tiktok", "youtube", "reddit")
-DICT_FIELDS = ("contexts", "competitors", "report_groups", "aliases")
+DICT_FIELDS = ("contexts", "competitors", "report_groups", "aliases", "watch_accounts")
 
 
 class ProjectError(ValueError):

@@ -264,7 +264,7 @@ def cmd_render(a) -> dict:
 def cmd_status(a) -> dict:
     p = _load(a.project)
     with _store(p) as store:
-        store.close_interrupted_runs()  # a stopped collect must not show as running forever
+        store.close_interrupted_runs()  # only runs whose collect process is gone
         last = store.last_run()
         if last is None:
             return {"project": p.name, "last_run": None, "failed_sources": [],

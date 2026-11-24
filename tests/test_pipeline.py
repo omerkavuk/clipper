@@ -79,7 +79,7 @@ def test_one_collector_raising_gives_partial_run(store, p):
     sts = store.source_statuses(run_id)
     assert any(not s.ok and "timeout" in s.error and s.source == "fake_raises" for s in sts)
     assert len(store.items(run_id)) == 3
-    assert store.run(run_id).stats == {"collected": 3, "in_window": 3, "new": 3, "sources_failed": 1,
+    assert store.run(run_id).stats == {"collected": 3, "in_window": 3, "new": 3, "known": 0, "sources_failed": 1,
                                              "malformed": 0}
 
 
@@ -263,3 +263,11 @@ def test_google_links_get_publisher_links_even_without_full_text(store, p, tmp_p
                       fetch=fake_fetch, resolve_links=resolve)
     assert len(asked) == 1 and len(asked[0]) == 2  # one batched call
     assert sorted(i.canonical_url for i in store.items(run_id)) == ["https://pub.it/G1", "https://pub.it/G2"]
+
+
+def test_next_window_goes_back_for_searches_that_failed(store):
+    r = store.start_run(RunWindow(NOW - timedelta(days=7), NOW))
+    store.finish_run(r, "partial", {"retry_from": (NOW - timedelta(days=5)).isoformat()})
+    store.mark_reported(r)
+    w = resolve_window(store, "weekly", NOW + timedelta(days=7))
+    assert w.since == NOW - timedelta(days=5)  # not NOW: the failed days are searched again

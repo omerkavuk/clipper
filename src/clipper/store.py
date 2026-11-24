@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -28,6 +29,14 @@ CREATE TABLE IF NOT EXISTS pending_tags (
     run_id INTEGER NOT NULL REFERENCES runs(id), item_id INTEGER NOT NULL, tags TEXT NOT NULL,
     PRIMARY KEY (run_id, item_id));
 CREATE TABLE IF NOT EXISTS stories (item_id INTEGER PRIMARY KEY REFERENCES items(id), story_id INTEGER NOT NULL);
+-- An article can belong to several report windows (a week, then the month that holds it).
+CREATE TABLE IF NOT EXISTS run_items (
+    run_id INTEGER NOT NULL REFERENCES runs(id), item_id INTEGER NOT NULL REFERENCES items(id),
+    PRIMARY KEY (run_id, item_id));
+-- Tags belong to one report's completed tagging batch; a new batch replaces them all.
+CREATE TABLE IF NOT EXISTS run_tags (
+    run_id INTEGER NOT NULL REFERENCES runs(id), item_id INTEGER NOT NULL REFERENCES items(id),
+    tags TEXT NOT NULL, PRIMARY KEY (run_id, item_id));
 CREATE TABLE IF NOT EXISTS source_status (
     id INTEGER PRIMARY KEY, run_id INTEGER NOT NULL REFERENCES runs(id),
     source TEXT, target TEXT, ok INTEGER, items INTEGER, error TEXT, covered_since TEXT);
@@ -68,12 +77,45 @@ def _row_to_item(r: sqlite3.Row) -> Item:
     )
 
 
+def _alive(pid: int) -> bool:
+    """Is the process still running? (Windows has no harmless os.kill test.)"""
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)  # query limited information
+        if not handle:
+            return False
+        code = ctypes.c_ulong()
+        ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+        ctypes.windll.kernel32.CloseHandle(handle)
+        return code.value == 259  # STILL_ACTIVE
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
 class Store:
     def __init__(self, db_path: Path):
+        self.lock_path = Path(str(db_path) + ".collect.lock")
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self._db = sqlite3.connect(db_path)
         self._db.row_factory = sqlite3.Row
         self._db.executescript(_SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """Databases from before 1.5: every article belongs to the run that found it, and its
+        tags to that run."""
+        with self._db:
+            self._db.execute("INSERT OR IGNORE INTO run_items (run_id, item_id) SELECT run_id, id FROM items")
+            if not self._db.execute("SELECT 1 FROM run_tags LIMIT 1").fetchone():
+                self._db.execute("INSERT OR IGNORE INTO run_tags (run_id, item_id, tags)"
+                                 " SELECT i.run_id, t.item_id, t.tags FROM tags t JOIN items i ON i.id=t.item_id")
 
     def close(self) -> None:
         self._db.close()
@@ -91,8 +133,31 @@ class Store:
                                    (_iso(window.since), _iso(window.until)))
         return cur.lastrowid
 
+    # collection lock: one collect at a time, and a running one is never mistaken for a dead one
+    def collect_running(self) -> bool:
+        try:
+            pid = int(self.lock_path.read_text(encoding="utf-8").split()[0])
+        except (OSError, ValueError, IndexError):
+            return False
+        return _alive(pid)
+
+    def take_collect_lock(self) -> None:
+        if self.collect_running():
+            raise RuntimeError("another collection is already running for this project")
+        self.lock_path.write_text(f"{os.getpid()}\n", encoding="utf-8")
+
+    def release_collect_lock(self) -> None:
+        try:
+            if self.lock_path.read_text(encoding="utf-8").split()[0] == str(os.getpid()):
+                self.lock_path.unlink()
+        except (OSError, IndexError):
+            pass
+
     def close_interrupted_runs(self) -> int:
-        """Mark runs left at 'running' (a stopped or crashed collect) as failed. Returns how many."""
+        """Mark runs left at 'running' by a stopped or crashed collect as failed. Does nothing
+        while a collect is really running. Returns how many."""
+        if self.collect_running():
+            return 0
         rows = self._db.execute("SELECT id, stats FROM runs WHERE status='running'").fetchall()
         with self._db:
             for r in rows:
@@ -157,30 +222,23 @@ class Store:
         return last.until if last else None
 
     # items
-    def _dedupe_runs(self, run_id: int) -> list[int]:
-        """Runs whose items count for dedupe: this run, plus earlier reported runs
-        whose window overlaps this run's window (windows are normally disjoint)."""
-        current = self.run(run_id)
-        ids = [run_id]
-        for r in self._reported_runs():
-            if r.id != run_id and r.since < current.until and r.until > current.since:
-                ids.append(r.id)
-        return ids
-
-    def _is_stored(self, item: Item, url_norm: str, run_ids: list[int]) -> bool:
-        marks = ",".join("?" * len(run_ids))
-        rows = self._db.execute(
-            f"SELECT * FROM items WHERE run_id IN ({marks}) AND (url_norm=? OR outlet_domain=?)",
-            (*run_ids, url_norm, item.outlet_domain)).fetchall()
-        return any(is_duplicate(item, _row_to_item(r)) for r in rows)
+    def _existing(self, item: Item, url_norm: str) -> int | None:
+        """The id of an article already stored that this one duplicates, if any."""
+        rows = self._db.execute("SELECT * FROM items WHERE url_norm=? OR outlet_domain=?",
+                                (url_norm, item.outlet_domain)).fetchall()
+        return next((r["id"] for r in rows if is_duplicate(item, _row_to_item(r))), None)
 
     def add_items(self, run_id: int, items: list[Item]) -> list[int]:
+        """Store new articles and attach them to the run. An article already known is not stored
+        twice: the run just includes it. Returns the ids of the articles that were new."""
         ids: list[int] = []
-        run_ids = self._dedupe_runs(run_id)
         with self._db:
             for it in items:
                 url_norm = normalize_url(it.url)
-                if self._is_stored(it, url_norm, run_ids):
+                known = self._existing(it, url_norm)
+                if known is not None:
+                    self._db.execute("INSERT OR IGNORE INTO run_items (run_id, item_id) VALUES (?, ?)",
+                                     (run_id, known))
                     continue
                 cur = self._db.execute(
                     "INSERT INTO items (run_id, source, outlet, outlet_domain, url, url_norm, title,"
@@ -190,11 +248,25 @@ class Store:
                      _iso(it.published_at), _iso(it.collected_at), it.snippet, it.full_text,
                      it.language, json.dumps(it.matched_queries), it.canonical_url,
                      int(it.subscribers_only)))
+                self._db.execute("INSERT INTO run_items (run_id, item_id) VALUES (?, ?)",
+                                 (run_id, cur.lastrowid))
                 ids.append(cur.lastrowid)
         return ids
 
+    def attach_window(self, run_id: int) -> int:
+        """Include in the run every known article published in its window, however it was
+        found before (a monthly report holds the articles of its weekly reports). Returns how
+        many were added."""
+        run = self.run(run_id)
+        with self._db:
+            cur = self._db.execute(
+                "INSERT OR IGNORE INTO run_items (run_id, item_id) SELECT ?, id FROM items"
+                " WHERE published_at >= ? AND published_at < ?", (run_id, _iso(run.since), _iso(run.until)))
+        return cur.rowcount
+
     def items(self, run_id: int) -> list[Item]:
-        rows = self._db.execute("SELECT * FROM items WHERE run_id=? ORDER BY id", (run_id,))
+        rows = self._db.execute("SELECT i.* FROM items i JOIN run_items m ON m.item_id=i.id"
+                                " WHERE m.run_id=? ORDER BY i.id", (run_id,))
         return [_row_to_item(r) for r in rows]
 
     def get_item(self, item_id: int) -> Item | None:
@@ -211,10 +283,13 @@ class Store:
                 (item.full_text, item.canonical_url, int(item.subscribers_only), item.id))
 
     # tags and stories
-    def set_tags(self, item_id: int, tags: dict) -> None:
+    def set_tags(self, item_id: int, tags: dict, run_id: int | None = None) -> None:
+        """Tag one article, for one run, or for every run that holds it."""
+        runs = [run_id] if run_id is not None else [
+            r["run_id"] for r in self._db.execute("SELECT run_id FROM run_items WHERE item_id=?", (item_id,))]
         with self._db:
-            self._db.execute("INSERT OR REPLACE INTO tags (item_id, tags) VALUES (?, ?)",
-                             (item_id, json.dumps(tags)))
+            self._db.executemany("INSERT OR REPLACE INTO run_tags (run_id, item_id, tags) VALUES (?, ?, ?)",
+                                 [(r, item_id, json.dumps(tags)) for r in runs])
 
     def add_pending_tags(self, run_id: int, tags: dict[int, dict]) -> None:
         with self._db:
@@ -231,17 +306,17 @@ class Store:
             self._db.execute("DELETE FROM pending_tags WHERE run_id=?", (run_id,))
 
     def commit_pending_tags(self, run_id: int, item_ids: list[int]) -> None:
-        """Move a complete batch into the tags table in one transaction."""
+        """Make a complete batch the run's tags, in one transaction. Tags from an earlier batch
+        for this run are removed, so a report only ever uses the current batch."""
         pending = self.pending_tags(run_id)
         with self._db:
-            self._db.executemany("INSERT OR REPLACE INTO tags (item_id, tags) VALUES (?, ?)",
-                                 [(i, json.dumps(pending[i])) for i in item_ids])
+            self._db.execute("DELETE FROM run_tags WHERE run_id=?", (run_id,))
+            self._db.executemany("INSERT INTO run_tags (run_id, item_id, tags) VALUES (?, ?, ?)",
+                                 [(run_id, i, json.dumps(pending[i])) for i in item_ids])
             self._db.execute("DELETE FROM pending_tags WHERE run_id=?", (run_id,))
 
     def tags(self, run_id: int) -> dict[int, dict]:
-        rows = self._db.execute(
-            "SELECT t.item_id, t.tags FROM tags t JOIN items i ON i.id=t.item_id WHERE i.run_id=?",
-            (run_id,))
+        rows = self._db.execute("SELECT item_id, tags FROM run_tags WHERE run_id=?", (run_id,))
         return {r["item_id"]: json.loads(r["tags"]) for r in rows}
 
     def set_story(self, item_id: int, story_id: int) -> None:
@@ -251,8 +326,8 @@ class Store:
 
     def stories(self, run_id: int) -> dict[int, list[int]]:
         rows = self._db.execute(
-            "SELECT s.story_id, s.item_id FROM stories s JOIN items i ON i.id=s.item_id"
-            " WHERE i.run_id=? ORDER BY s.story_id, s.item_id", (run_id,))
+            "SELECT s.story_id, s.item_id FROM stories s JOIN run_items m ON m.item_id=s.item_id"
+            " WHERE m.run_id=? ORDER BY s.story_id, s.item_id", (run_id,))
         out: dict[int, list[int]] = {}
         for r in rows:
             out.setdefault(r["story_id"], []).append(r["item_id"])

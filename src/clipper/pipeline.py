@@ -70,6 +70,10 @@ def resolve_window(store: Store, frequency: str, now: datetime,
     until = until or now
     if since is None:
         since = store.last_successful_until() or now - timedelta(days=FREQUENCY_DAYS[frequency])
+        last = store.last_reported_run()
+        retry = (last.stats or {}).get("retry_from") if last else None
+        if retry:  # the last report could not search everything: start from that gap
+            since = min(since, datetime.fromisoformat(retry))
     return RunWindow(since=since, until=until)
 
 
@@ -98,7 +102,8 @@ def _default_collectors(project: Project, progress: Callable[[str], None] | None
         ("gdelt", lambda: GdeltCollector(project.country, project.languages, project.exclude_domains,
                                          progress=progress)),
         ("social", lambda: SocialCollector(project.social, progress=progress,
-                                           own_accounts=project.own_accounts) if project.social else None),
+                                           own_accounts=project.own_accounts,
+                                           watch_accounts=project.watch_accounts) if project.social else None),
     ]
     out = [make() for name, make in chosen if name not in skip]
     return [c for c in out if c is not None]
@@ -120,6 +125,14 @@ def collect(project: Project, store: Store, window: RunWindow,
     if collectors is None:
         collectors = (_default_collectors(project, progress, skip=skip) if skip
                       else _default_collectors(project, progress))
+    store.take_collect_lock()
+    try:
+        return _collect_locked(project, store, window, collectors)
+    finally:
+        store.release_collect_lock()
+
+
+def _collect_locked(project, store, window, collectors) -> int:
     store.close_interrupted_runs()
     run_id = store.start_run(window)
     stats: dict = {"collected": 0, "in_window": 0, "new": 0, "sources_failed": 0, "malformed": 0}
@@ -158,6 +171,8 @@ def _run(project: Project, store: Store, window: RunWindow, collectors: list[Col
     stats["in_window"] = len(in_window)
     new_ids = set(store.add_items(run_id, in_window))
     stats["new"] = len(new_ids)
+    # Articles already known from an earlier run that fall in this window belong here too.
+    stats["known"] = store.attach_window(run_id) + (len(in_window) - len(new_ids))
 
     stored = [i for i in store.items(run_id) if i.id in new_ids]
     for group in group_stories(stored):
@@ -167,6 +182,10 @@ def _run(project: Project, store: Store, window: RunWindow, collectors: list[Col
 
     for st in statuses:
         store.add_source_status(run_id, st)
+    gaps = [getattr(c, "incomplete_from", None) for c in collectors]
+    gaps = [g for g in gaps if g is not None]
+    if gaps:  # some languages or weeks could not be searched: the next run goes back for them
+        stats["retry_from"] = _iso(min(gaps))
 
     failed = sum(1 for s in statuses if not s.ok)
     stats["sources_failed"] = failed

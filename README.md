@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 1.4.0" src="https://img.shields.io/badge/version-1.4.0-1a8db3?style=flat-square">
+  <img alt="Version 1.5.0" src="https://img.shields.io/badge/version-1.5.0-1a8db3?style=flat-square">
   <img alt="Status: demo" src="https://img.shields.io/badge/status-demo-e8743b?style=flat-square">
   <img alt="Claude Code plugin" src="https://img.shields.io/badge/Claude%20Code-plugin-0f1b3d?style=flat-square">
   <img alt="Python 3.12+" src="https://img.shields.io/badge/python-3.12%2B-0f1b3d?style=flat-square">
@@ -219,7 +219,7 @@ flowchart LR
     W --> O["Report + private note"]
 ```
 
-1. **Collect.** All sources are searched at once, each with its own time limit, so a run takes minutes. Anything outside the period, from your own sites or from job boards is dropped.
+1. **Collect.** The sources are searched one after another, each with its own time limit, so a run takes minutes. Anything outside the period, from your own sites or from job boards is dropped.
 2. **Clean up.** Duplicates are merged, and one story across several outlets is grouped together.
 3. **Read and sort.** Each article is checked for relevance and tagged with its tone, topic, type, and how you're named. Where possible, the full text is read from the publisher's page.
 4. **Check.** The report is only written once every article has been sorted. If something can't be finished, Clipper says so instead of reporting "no coverage".
@@ -252,7 +252,8 @@ Your source list is built for your country during setup. You can add or remove o
 | YouTube | No |
 | Reddit | No |
 | LinkedIn (public posts) | No |
-| X, Instagram, Facebook | Once, by you, in a private browser window |
+| X, Facebook | Once, by you, in a private browser window |
+| Instagram (posts from accounts you choose to watch) | Once, by you, in a private browser window |
 
 Social search runs through a private copy of [Agent Reach](https://github.com/Panniantong/Agent-Reach), kept apart from anything else on your computer. Clipper never sees your passwords, and it only reads: it never posts, likes or comments. Your own accounts are left out of the results.
 
@@ -273,7 +274,7 @@ Social search runs through a private copy of [Agent Reach](https://github.com/Pa
 
 ## What it costs
 
-Clipper is free, and so are all its built-in news routes. The only cost is the usage it adds to your Claude plan. Setup shows an estimate per report and per month before anything runs, and each private note shows what that run actually used. To bring the cost down, use fewer sources, stricter searches or a lower article limit. You can ask for any of these at any time.
+Clipper is free, and so are all its built-in news routes. The only cost is the usage it adds to your Claude plan. Setup shows an estimate per report and per month before anything runs, and each private note shows an estimate for that run, worked out from its article counts. To bring the cost down, use fewer sources, stricter searches or a lower article limit. You can ask for any of these at any time.
 
 ---
 

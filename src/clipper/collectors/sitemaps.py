@@ -10,6 +10,7 @@ or failing a title, the words in its web address ("…/green-schools-premiati-a-
 from __future__ import annotations
 
 import gzip
+from dataclasses import dataclass
 import io
 import re
 import time
@@ -26,7 +27,6 @@ from clipper.queries import Query, matching_ids
 USER_AGENT = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 TIMEOUT = 25                   # some news sites take 10+ seconds per sitemap file
-END_SLACK = timedelta(days=2)  # files are read until they also cover the end of the period
 MAX_BYTES = 8_000_000          # per sitemap file, after unzipping
 MAX_FILES = 10                 # sitemap files read per outlet
 TITLES_PER_OUTLET = 15         # pages opened to read a proper headline when the sitemap has none
@@ -93,6 +93,42 @@ def slug_text(url: str) -> str:
     return " ".join(_WORDS.sub(" ", last).split())
 
 
+@dataclass
+class SitemapResult:
+    items: list[Item]
+    oldest: datetime | None   # the earliest date among the entries read
+    error: str | None         # set when nothing usable was read
+    complete: bool            # every file that could hold the period was read
+    note: str | None = None   # why it is incomplete, when it is
+
+
+def _entries(root):
+    """(address, date, title, date in the address) for each dated entry of a urlset."""
+    for el in root:
+        if _local(el.tag) != "url":
+            continue
+        loc = title = None
+        published = lastmod = None
+        for child in el.iter():
+            name = _local(child.tag)
+            if name == "loc" and loc is None:
+                loc = (child.text or "").strip()
+            elif name == "publication_date":
+                published = _date(child.text)
+            elif name == "lastmod":
+                lastmod = _date(child.text)
+            elif name == "title" and child.text:
+                title = " ".join(child.text.split())
+        if not loc:
+            continue
+        m = _URL_DATE.search(loc)
+        url_date = (datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)), tzinfo=timezone.utc)
+                    if m else None)
+        when = published or url_date or lastmod
+        if when is not None:
+            yield loc, when, title, url_date
+
+
 def _is_article(loc: str, title: str | None, url_date) -> bool:
     """Leave out list pages (tags, categories, authors) and bare section pages."""
     parts = [p.lower() for p in urlsplit(loc).path.split("/") if p]
@@ -108,6 +144,7 @@ class SitemapReader:
                  clock: Callable[[], float] = time.monotonic):
         self.session = session or requests.Session()
         self.clock = clock
+        self.found_in_robots = False  # set by find(): robots.txt listed the sitemaps
 
     def _get(self, url: str, deadline: float) -> bytes | None:
         if self.clock() > deadline:
@@ -138,75 +175,64 @@ class SitemapReader:
             for line in robots.decode("utf-8", "replace").splitlines():
                 if line.lower().startswith("sitemap:"):
                     found.append(line.split(":", 1)[1].strip())
+        self.found_in_robots = bool(found)
         return list(dict.fromkeys(found)) or [base + g for g in GUESSES]
 
     def read(self, outlet: Outlet, queries: list[Query], window: RunWindow,
-             deadline: float) -> tuple[list[Item], datetime | None, str | None]:
-        """Matching articles, how far back the sitemap reached, and an error if it didn't work."""
+             deadline: float) -> SitemapResult:
+        """Read every sitemap file that can hold the period. Never raises: a failure is reported
+        in the result, and whatever was found before it is kept."""
         months = _months(window)
-        queue = self.find(outlet.domain, deadline)
         seen: set[str] = set()
         entries: dict[str, tuple[datetime, str]] = {}
         oldest: datetime | None = None
-        newest: datetime | None = None
         files = 0
+        complete = True       # every file that could hold the period was read
+        problem: str | None = None
         try:
-            while queue and files < MAX_FILES:
-                url = queue.pop(0)
+            listed = self.find(outlet.domain, deadline)
+            guessed = not self.found_in_robots
+            queue = [(u, not guessed) for u in listed]  # (address, must it be read?)
+            while queue:
+                url, required = queue.pop(0)
                 if url in seen:
                     continue
+                if files >= MAX_FILES:
+                    complete, problem = False, "too many sitemap files; the rest were not read"
+                    break
                 seen.add(url)
                 data = self._get(url, deadline)
                 if not data:
+                    if required:
+                        complete, problem = False, "a sitemap file could not be read"
                     continue
                 try:
                     root = etree.fromstring(data, _PARSER)
                 except etree.XMLSyntaxError:
-                    continue
+                    root = None
                 if root is None:
+                    if required:
+                        complete, problem = False, "a sitemap file could not be read"
                     continue
                 files += 1
                 if _local(root.tag) == "sitemapindex":
-                    queue = self._pick_children(root, url, window, months) + queue
+                    queue = [(c, True) for c in self._pick_children(root, url, window, months)] + queue
                     continue
-                for el in root:
-                    if _local(el.tag) != "url":
-                        continue
-                    loc = title = None
-                    published = lastmod = None
-                    for child in el.iter():
-                        name = _local(child.tag)
-                        if name == "loc" and loc is None:
-                            loc = (child.text or "").strip()
-                        elif name == "publication_date":
-                            published = _date(child.text)
-                        elif name == "lastmod":
-                            lastmod = _date(child.text)
-                        elif name == "title" and child.text:
-                            title = " ".join(child.text.split())
-                    if not loc:
-                        continue
-                    m = _URL_DATE.search(loc)
-                    url_date = (datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)), tzinfo=timezone.utc)
-                                if m else None)
-                    when = published or url_date or lastmod
-                    if when is None:
-                        continue
+                for loc, when, title, url_date in _entries(root):
                     oldest = when if oldest is None or when < oldest else oldest
-                    newest = when if newest is None or when > newest else newest
                     if window.since <= when < window.until and _is_article(loc, title, url_date):
                         entries[loc] = (when, title or "")
-                if (oldest is not None and oldest <= window.since and newest is not None
-                        and newest >= min(window.until, datetime.now(timezone.utc)) - END_SLACK):
-                    break  # what was read covers the whole period
-        except TimeoutError as e:
-            if not entries:
-                return [], oldest, str(e)
+        except TimeoutError:
+            complete, problem = False, "time budget exceeded before all sitemap files were read"
         except Exception as e:  # one outlet's sitemap must never stop the run
-            return [], None, f"sitemap failed: {type(e).__name__}"
+            complete, problem = False, f"sitemap failed: {type(e).__name__}"
         if files == 0:
-            return [], None, "no sitemap found"
-        return self._items(outlet, queries, entries, deadline), oldest, None
+            return SitemapResult([], None, problem or "no sitemap found", False)
+        try:
+            items = self._items(outlet, queries, entries, deadline)
+        except Exception as e:
+            return SitemapResult([], oldest, f"sitemap failed: {type(e).__name__}", False)
+        return SitemapResult(items, oldest, None, complete, problem)
 
     def _pick_children(self, root, index_url: str, window: RunWindow, months: set[str]) -> list[str]:
         """The child sitemaps likely to hold the period, newest first: by month in the name,
