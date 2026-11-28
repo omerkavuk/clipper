@@ -80,7 +80,7 @@ def test_one_collector_raising_gives_partial_run(store, p):
     assert any(not s.ok and "timeout" in s.error and s.source == "fake_raises" for s in sts)
     assert len(store.items(run_id)) == 3
     assert store.run(run_id).stats == {"collected": 3, "in_window": 3, "new": 3, "known": 0, "sources_failed": 1,
-                                             "malformed": 0}
+                                             "malformed": 0, "retry_from": "2026-11-07T00:00:00+00:00"}
 
 
 def test_all_failed_and_no_collectors(store, p):
@@ -271,3 +271,38 @@ def test_next_window_goes_back_for_searches_that_failed(store):
     store.mark_reported(r)
     w = resolve_window(store, "weekly", NOW + timedelta(days=7))
     assert w.since == NOW - timedelta(days=5)  # not NOW: the failed days are searched again
+
+
+class FakeFailedSearch:
+    name = "gdelt"
+
+    def collect(self, queries, window):
+        return [], [SourceStatus("gdelt", "q", False, 0, "timeout", None)]
+
+
+def test_crashed_or_failed_search_sends_next_window_back(store, p):
+    run_id = collect(p, store, WIN, [FakeOK([]), FakeRaises("timeout")])
+    assert store.run(run_id).status == "partial"
+    store.mark_reported(run_id)
+    later = NOW + timedelta(days=7)
+    assert resolve_window(store, "weekly", later).since == SINCE  # the missed week comes back
+    run2 = collect(p, store, RunWindow(SINCE, later), [FakeOK([]), FakeFailedSearch()])
+    assert store.run(run2).stats["retry_from"] == "2026-11-07T00:00:00+00:00"
+
+
+def test_successful_collection_clears_the_gap(store, p):
+    r1 = collect(p, store, WIN, [FakeOK([]), FakeRaises("timeout")])
+    store.mark_reported(r1)
+    later = NOW + timedelta(days=7)
+    r2 = collect(p, store, resolve_window(store, "weekly", later), [FakeOK([])])
+    assert "retry_from" not in store.run(r2).stats
+    store.mark_reported(r2)
+    assert resolve_window(store, "weekly", later + timedelta(days=7)).since == later
+
+
+def test_a_source_that_keeps_failing_does_not_stretch_the_window_forever(store, p):
+    old = RunWindow(SINCE - timedelta(days=120), NOW)
+    r = collect(p, store, old, [FakeOK([]), FakeRaises("timeout")])
+    store.mark_reported(r)
+    w = resolve_window(store, "weekly", NOW + timedelta(days=7))
+    assert w.since == NOW - timedelta(days=7 * 6)

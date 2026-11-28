@@ -237,6 +237,7 @@ class Store:
                 url_norm = normalize_url(it.url)
                 known = self._existing(it, url_norm)
                 if known is not None:
+                    self._merge_evidence(known, it)
                     self._db.execute("INSERT OR IGNORE INTO run_items (run_id, item_id) VALUES (?, ?)",
                                      (run_id, known))
                     continue
@@ -252,6 +253,21 @@ class Store:
                                  (run_id, cur.lastrowid))
                 ids.append(cur.lastrowid)
         return ids
+
+    def _merge_evidence(self, item_id: int, dup: Item) -> None:
+        """A duplicate found by another route keeps the stored article and link, but adds the
+        searches that matched it (a set: collecting again adds nothing). A publisher link from
+        the duplicate fills in a stored Google News link that has none yet."""
+        row = self._db.execute("SELECT url, canonical_url, matched_queries FROM items WHERE id=?",
+                               (item_id,)).fetchone()
+        have = json.loads(row["matched_queries"] or "[]")
+        merged = have + [q for q in dup.matched_queries if q not in have]
+        canonical = row["canonical_url"]
+        if not canonical and "news.google.com" in row["url"] and "news.google.com" not in dup.url:
+            canonical = dup.url
+        if merged != have or canonical != row["canonical_url"]:
+            self._db.execute("UPDATE items SET matched_queries=?, canonical_url=? WHERE id=?",
+                             (json.dumps(merged), canonical, item_id))
 
     def attach_window(self, run_id: int) -> int:
         """Include in the run every known article published in its window, however it was

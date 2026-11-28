@@ -163,7 +163,8 @@ def cmd_compare(a) -> dict:
     routes = {}
     for name in names:
         if name == "google_news":
-            routes[name] = GoogleNewsCollector(p.country, p.languages[0], p.exclude_domains,
+            # Same country and languages as Brave; no abroad edition, which Brave has no match for.
+            routes[name] = GoogleNewsCollector(p.country, p.languages, p.exclude_domains,
                                                progress=_progress)
         elif name == "brave":
             key = brave_key()

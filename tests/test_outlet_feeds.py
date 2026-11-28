@@ -199,3 +199,25 @@ def test_deep_feed_needs_no_site_search():
     responses.add(responses.GET, FEED_URL, body=FEED)
     make([outlet()]).collect([Q], WINDOW)
     assert len(responses.calls) == 1
+
+
+BODY_FEED = """<?xml version="1.0"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+<channel><title>x</title>
+<item><title>Nuovi fondi per il clima</title><link>https://www.example.it/d</link>
+<pubDate>Tue, 20 Oct 2026 10:00:00 GMT</pubDate><description>Breve</description>
+<content:encoded><![CDATA[<p>Il progetto di <b>Aurora</b> a Torino.</p>]]></content:encoded></item>
+<item><title>Calcio: derby</title><link>https://www.example.it/e</link>
+<pubDate>Tue, 20 Oct 2026 11:00:00 GMT</pubDate><description>sport</description>
+<content:encoded><![CDATA[<p>Aurora calcio</p>]]></content:encoded></item>
+<item><title>Aurora fuori periodo</title><link>https://www.example.it/f</link>
+<pubDate>Wed, 01 Jul 2026 10:00:00 GMT</pubDate><description>old</description></item>
+</channel></rss>"""
+
+
+@responses.activate
+def test_mention_only_in_the_body_is_found():
+    responses.add(responses.GET, FEED_URL, body=BODY_FEED)
+    q = Query("subject", "Subject", [["Aurora"]], ["calcio"])
+    items, _ = make([outlet()]).collect([q], WINDOW)
+    assert [i.url for i in items] == ["https://www.example.it/d"]
+    assert items[0].snippet == "Breve"

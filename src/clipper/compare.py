@@ -30,6 +30,17 @@ def _key_match(a: dict, it: Item) -> bool:
     return a["domain"] == it.outlet_domain and title_match(a["title"], it.title)
 
 
+def _settings(collector) -> dict:
+    """What the route actually searched with, including a provider's fallback."""
+    out = {"country": getattr(collector, "country", None),
+           "languages": list(getattr(collector, "languages", []) or [])}
+    if getattr(collector, "abroad", False):
+        out["abroad_edition"] = True
+    if getattr(collector, "_country_ok", True) is False:
+        out["fallback"] = f"{out['country']} is not a Brave market: searched worldwide in each language"
+    return out
+
+
 def compare(project: Project, window: RunWindow, routes: dict, out_dir: Path) -> dict:
     """`routes` maps a route name to a collector. Writes articles.json and returns counts."""
     queries = build_queries(project)
@@ -42,7 +53,8 @@ def compare(project: Project, window: RunWindow, routes: dict, out_dir: Path) ->
                 and not _excluded(i.outlet_domain, excluded)]
         per_route[name] = {"found": len(kept), "searches": len(statuses),
                            "searches_failed": sum(1 for s in statuses if not s.ok),
-                           "errors": sorted({s.error for s in statuses if s.error})[:5]}
+                           "errors": sorted({s.error for s in statuses if s.error})[:5],
+                           "settings": _settings(collector)}
         for it in kept:
             match = next((a for a in articles if _key_match(a, it)), None)
             if match is None:

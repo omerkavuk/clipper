@@ -73,11 +73,16 @@ def resolve_window(store: Store, frequency: str, now: datetime,
         last = store.last_reported_run()
         retry = (last.stats or {}).get("retry_from") if last else None
         if retry:  # the last report could not search everything: start from that gap
-            since = min(since, datetime.fromisoformat(retry))
+            # A source that keeps failing must not stretch every window further back.
+            floor = since - timedelta(days=FREQUENCY_DAYS[frequency] * MAX_SCALE)
+            since = min(since, max(datetime.fromisoformat(retry), floor))
     return RunWindow(since=since, until=until)
 
 
 SOURCES = ("outlet", "google_news", "bing_news", "brave", "gdelt", "social")
+# News searches whose failure sends the next run back over the window. A dead outlet or a
+# social login that has lapsed is not retried this way: it would fail again every time.
+RETRIED = ("google_news", "bing_news", "brave", "gdelt")
 
 
 def _default_collectors(project: Project, progress: Callable[[str], None] | None = None,
@@ -156,12 +161,20 @@ def _run(project: Project, store: Store, window: RunWindow, collectors: list[Col
 
     raw: list[Item] = []
     statuses: list[SourceStatus] = []
+    gaps: list[datetime] = []
     for collector in collectors:
+        name = getattr(collector, "name", type(collector).__name__)
         try:
             items, sts = collector.collect(queries, window)
         except Exception as exc:  # one failing source must not stop the run
-            name = getattr(collector, "name", type(collector).__name__)
             items, sts = [], [SourceStatus(name, "*", False, 0, str(exc), None)]
+            gaps.append(window.since)  # nothing says how far it got: retry the whole window
+        else:
+            gap = getattr(collector, "incomplete_from", None)
+            if gap is None and name in RETRIED and any(not s.ok for s in sts):
+                gap = window.since
+            if gap is not None:
+                gaps.append(gap)
         raw.extend(items)
         statuses.extend(sts)
     stats["collected"] = len(raw)
@@ -190,8 +203,6 @@ def _run(project: Project, store: Store, window: RunWindow, collectors: list[Col
     deferred = [t for c in collectors for t in getattr(c, "deferred_terms", [])]
     if deferred:
         stats["social_deferred"] = list(dict.fromkeys(deferred))
-    gaps = [getattr(c, "incomplete_from", None) for c in collectors]
-    gaps = [g for g in gaps if g is not None]
     if gaps:  # some languages or weeks could not be searched: the next run goes back for them
         stats["retry_from"] = _iso(min(gaps))
 

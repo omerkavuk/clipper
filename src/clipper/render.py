@@ -18,9 +18,14 @@ from clipper.tags import check_reportable
 
 ESTIMATE_REPORT_ITEMS = 40
 
+# Only words and phrases about how coverage was collected; ordinary words such as "feeds"
+# or "scrapped" stay ("The food programme feeds 500 children").
 METHOD_WORDS = re.compile(
-    r"\bgoogle news\b|\bgdelt\b|\brss\b|\bfeeds?\b|\bsearch engine\b|\bscrap\w*"
-    r"|\bai agent\b|\bthe agent\b|\btokens?\b", re.IGNORECASE)
+    r"\bgoogle news\b|\bgdelt\b|\brss\b|\batom feeds?\b|\bnews ?feeds?\b|\bsearch engines?\b"
+    r"|\b(?:found|collected|picked up|retrieved|gathered)\s+(?:through|via|from|in|by)\s+"
+    r"(?:an?\s+|the\s+|its\s+)?(?:\w+\s+)?(?:feeds?|sitemaps?|search(?:es)?|crawl\w*)\b"
+    r"|\bweb ?scrap\w*|\bscrap(?:e|er|ers|ing)\b|\bcrawler\b|\bai agent\b|\bthe agent\b"
+    r"|\b(?:api|input|output) tokens?\b|\btokens? (?:used|spent|count)\b", re.IGNORECASE)
 SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+")
 LINE_PREFIX = re.compile(r"^(\s*(?:[-*]\s+|\d+\.\s+|#{1,6}\s+))?(.*)$", re.DOTALL)
 
@@ -123,9 +128,29 @@ def _summary(draft: Path, removed_sentences: list[str]) -> tuple[str, int, int]:
     return " ".join(sentences[:layout.SUMMARY_SENTENCES]), removed_refs, removed_links
 
 
-def _guard_text(text: str) -> str:
-    kept = _guard_line(text, [])
-    return kept or ""
+def coverage_note(store: Store, run_id: int) -> str:
+    """One plain sentence for the shared report when collection was not complete. Which
+    sources failed, and why, is in the private run note."""
+    run = store.run(run_id)
+    if run.status != "partial":
+        return ""
+    statuses = store.source_statuses(run_id)
+    outlets = [s for s in statuses if s.source == "outlet"]
+    searches = [s for s in statuses if s.source != "outlet"]
+    parts = []
+    failed = sum(1 for s in searches if not s.ok)
+    if failed:
+        parts.append(f"{failed} of {len(searches)} searches did not finish")
+    down = sum(1 for s in outlets if not s.ok)
+    if down:
+        parts.append(f"{down} of {len(outlets)} outlet websites could not be reached")
+    if not parts:
+        return ""
+    text = " and ".join(parts) + ", so some coverage may be missing."
+    retry = (run.stats or {}).get("retry_from")
+    if retry:
+        text += f" The next report searches again from {_date(datetime.fromisoformat(retry))}."
+    return text[0].upper() + text[1:]
 
 
 def render_report(store: Store, run_id: int, draft: Path, project: Project, out_dir: Path) -> dict:
@@ -146,8 +171,16 @@ def render_report(store: Store, run_id: int, draft: Path, project: Project, out_
         project=project, since=run.since, last_day=run.until - timedelta(seconds=1),
         items=refs.items, tags=refs.tags, stories=refs.stories, outlets=project_outlets(project),
         previous_relevant=previous, summary=summary,
-        max_items=load_caps(project).max_report_items)
-    blocks = layout.build(data, guard=_guard_text)
+        max_items=load_caps(project).max_report_items, coverage_note=coverage_note(store, run_id))
+    removed_from_items: list[dict] = []
+
+    def guard(text: str, item_id: int | None = None) -> str:
+        found: list[str] = []
+        kept = _guard_line(text, found) or ""
+        removed_from_items.extend({"id": item_id, "text": s} for s in found)
+        return kept
+
+    blocks = layout.build(data, guard=guard)
 
     date = _file_date(run.until)
     reports = Path(out_dir) / "reports"
@@ -158,7 +191,8 @@ def render_report(store: Store, run_id: int, draft: Path, project: Project, out_
     layout.to_docx(blocks, docx_path)
     return {"report_md": str(md_path), "report_docx": str(docx_path),
             "removed_refs": removed_refs, "removed_links": removed_links,
-            "removed_sentences": removed_sentences, "fallback": bool(relevant and not summary),
+            "removed_sentences": removed_sentences, "removed_from_items": removed_from_items,
+            "fallback": bool(relevant and not summary),
             "relevant": relevant}
 
 
@@ -282,6 +316,10 @@ def render_run_note(store: Store, run_id: int, project: Project, render_stats: d
     if sentences:
         lines += ["", "### Removed from draft", ""]
         lines += [f"- {s}" for s in sentences]
+    from_items = rs.get("removed_from_items") or []
+    if from_items:
+        lines += ["", "### Removed from article summaries", ""]
+        lines += [f"- article {r['id']}: {r['text']}" for r in from_items]
 
     tokens = (len(tags) * TOKENS_PER_TAGGED_ITEM + REPORT_BASE_TOKENS
               + min(relevant, ESTIMATE_REPORT_ITEMS) * TOKENS_PER_REPORT_ITEM

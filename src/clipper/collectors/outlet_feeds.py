@@ -221,7 +221,11 @@ class OutletFeedsCollector:
                 continue
             title = _plain(e.get("title", ""))
             summary = _plain(e.get("summary", ""))
-            matched = matching_ids(queries, f"{title} {summary}")
+            # The full body (content:encoded, Atom content) often names the organisation when
+            # the headline and summary do not. It is only matched, never shown.
+            body = " ".join(_plain(c.get("value", "")) for c in e.get("content") or []
+                            if isinstance(c, dict))
+            matched = matching_ids(queries, f"{title} {summary} {body}")
             if not matched:
                 continue
             out.append(Item(

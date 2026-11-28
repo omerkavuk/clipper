@@ -244,3 +244,27 @@ def test_status_does_not_fail_a_collect_that_is_still_running(store):
     assert store.close_interrupted_runs() == 0 and store.run(r).status == "running"
     store.lock_path.write_text("999999999\n", encoding="utf-8")  # a process that is gone
     assert store.close_interrupted_runs() == 1 and store.run(r).status == "failed"
+
+
+def test_duplicate_from_another_route_adds_its_query_matches(store):
+    run = store.start_run(window())
+    first = item(url="https://a.it/x?utm_source=feed")
+    first.matched_queries = ["subject"]
+    second = item(url="https://a.it/x")
+    second.matched_queries = ["programme:Seeds", "subject"]
+    second.source = "google_news"
+    ids = store.add_items(run, [first, second])
+    (stored,) = store.items(run)
+    assert len(ids) == 1 and stored.url == "https://a.it/x?utm_source=feed"
+    assert stored.matched_queries == ["subject", "programme:Seeds"]
+    store.add_items(store.start_run(window()), [second, first])  # collecting again adds nothing
+    assert store.get_item(ids[0]).matched_queries == ["subject", "programme:Seeds"]
+
+
+def test_duplicate_publisher_link_fills_in_a_google_link(store):
+    run = store.start_run(window())
+    g = item(url="https://news.google.com/rss/articles/X1")
+    pub = item(url="https://a.it/x")
+    store.add_items(run, [g, pub])
+    (stored,) = store.items(run)
+    assert stored.url.startswith("https://news.google.com") and stored.canonical_url == "https://a.it/x"

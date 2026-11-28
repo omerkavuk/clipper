@@ -56,3 +56,24 @@ def test_score_refuses_untagged_articles(tmp_path, example_project):
     tags.write_text('{"items": []}', encoding="utf-8")
     with pytest.raises(ValueError, match="no valid tag"):
         score(example_project, tmp_path / "articles.json", tags)
+
+
+def test_compare_gives_both_routes_every_language(tmp_path, monkeypatch, example_project):
+    import argparse
+    from clipper import cli
+    from conftest import EXAMPLE
+    seen = {}
+    monkeypatch.setattr("clipper.collectors.brave.brave_key", lambda: "k")
+    monkeypatch.setattr("clipper.compare.compare", lambda p, w, routes, out: seen.update(routes) or {})
+    cli.cmd_compare(argparse.Namespace(project=str(EXAMPLE), since="2026-10-14T00:00:00+00:00",
+                                       until="2026-11-14T00:00:00+00:00", routes=None, out=str(tmp_path)))
+    assert seen["google_news"].languages == seen["brave"].languages == example_project.languages
+    assert len(example_project.languages) == 2 and not seen["google_news"].abroad
+
+
+def test_compare_records_settings_and_fallback(tmp_path, example_project):
+    route = Route([])
+    route.country, route.languages, route._country_ok = "XK", ["sq", "sr"], False
+    res = compare(example_project, W, {"brave": route}, tmp_path)
+    settings = res["routes"]["brave"]["settings"]
+    assert settings["languages"] == ["sq", "sr"] and "searched worldwide" in settings["fallback"]

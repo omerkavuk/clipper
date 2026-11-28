@@ -412,3 +412,59 @@ def test_foreign_outlet_heading_names_its_country(tmp_path, store, p):
     run, ids = make_run(store, [mk(1, outlet="Kypros News")], [dict(tag(), outlet_country="CY")])
     render_report(store, run, draft_with(tmp_path, "Fine."), p, tmp_path)
     assert "**Kypros News (Cyprus)**" in report_md(tmp_path, p)
+
+
+def test_partial_empty_run_says_collection_was_incomplete(tmp_path, store, p):
+    run, _ = make_run(store, [mk(1)], [tag(relevant=False)], status="partial",
+                      stats={"retry_from": "2026-11-07T09:00:00+00:00"})
+    store.add_source_status(run, SourceStatus("fake_ok", "*", True, 0, None, SINCE))
+    store.add_source_status(run, SourceStatus("gdelt", "*", False, 0, "timeout", None))
+    stats = render_report(store, run, draft_with(tmp_path, "x"), p, tmp_path)
+    md = report_md(tmp_path, p)
+    assert "found in this period" not in md and "in the searches that finished" in md
+    assert "1 of 2 searches did not finish" in md and "searches again from 07 Nov 2026" in md
+    assert "gdelt" not in md.lower()
+    from docx import Document
+    text = "\n".join(par.text for par in Document(stats["report_docx"]).paragraphs)
+    assert "Incomplete collection" in text and "1 of 2 searches did not finish" in text
+    note = render_run_note(store, run, p, stats, tmp_path).read_text("utf-8")
+    assert "timeout" in note
+
+
+def test_partial_run_with_findings_is_qualified_under_the_headline(tmp_path, store, p):
+    run, _ = make_run(store, [mk(1)], status="partial")
+    store.add_source_status(run, SourceStatus("outlet", "ansa.it", False, 0, "HTTP 500", None))
+    store.add_source_status(run, SourceStatus("outlet", "x.it", True, 0, None, SINCE))
+    render_report(store, run, draft_with(tmp_path, "Fine."), p, tmp_path)
+    lines = report_md(tmp_path, p).splitlines()
+    cov = next(n for n, line in enumerate(lines) if "**Coverage:**" in line)
+    assert "1 of 2 outlet websites could not be reached" in lines[cov + 1]
+
+
+def test_complete_empty_run_still_reports_no_coverage(tmp_path, store, p):
+    run, _ = make_run(store, [mk(1)], [tag(relevant=False)])
+    render_report(store, run, draft_with(tmp_path, "x"), p, tmp_path)
+    md = report_md(tmp_path, p)
+    assert "found in this period" in md and "Incomplete" not in md
+
+
+def test_failed_run_still_blocks_the_report(tmp_path, store, p):
+    from clipper.tags import TaggingIncomplete
+    run, _ = make_run(store, [mk(1)], status="failed")
+    with pytest.raises(TaggingIncomplete):
+        render_report(store, run, draft_with(tmp_path, "x"), p, tmp_path)
+
+
+def test_ordinary_feed_word_is_kept_and_method_sentence_removed(tmp_path, store, p):
+    run, ids = make_run(store, [mk(1), mk(2)], [
+        dict(tag(), summary="The food programme feeds 500 children."),
+        dict(tag(), summary="The story was found through an RSS feed.")])
+    draft = "The food programme feeds 500 children. It was found through the outlet feed."
+    stats = render_report(store, run, draft_with(tmp_path, draft), p, tmp_path)
+    md = report_md(tmp_path, p)
+    assert md.count("The food programme feeds 500 children.") == 2
+    assert "found through" not in md
+    assert stats["removed_sentences"] == ["It was found through the outlet feed."]
+    assert stats["removed_from_items"] == [{"id": ids[1], "text": "The story was found through an RSS feed."}]
+    note = render_run_note(store, run, p, stats, tmp_path).read_text("utf-8")
+    assert f"article {ids[1]}: The story was found through an RSS feed." in note

@@ -160,6 +160,7 @@ class ReportData:
     previous_relevant: int | None
     summary: str
     max_items: int
+    coverage_note: str = ""  # set when some searches did not finish
 
 
 def _rank_key(item: Item, tags: dict, tiers: dict[str, str]):
@@ -255,7 +256,7 @@ def _outlet_heading(unit: list[Item]) -> str:
 def _bullet(unit: list[Item], d: ReportData, guard) -> Block:
     lead = unit[0]
     runs: list[Run] = []
-    desc = guard(first_sentence(d.tags[lead.id].get("summary", "")))
+    desc = guard(first_sentence(d.tags[lead.id].get("summary", "")), lead.id)
     if desc:
         runs.append(Run(desc + " "))
     for n, it in enumerate(unit):
@@ -270,14 +271,19 @@ def _bullet(unit: list[Item], d: ReportData, guard) -> Block:
     return Block("bullet", runs)
 
 
-def build(d: ReportData, guard=lambda s: s) -> list[Block]:
+def build(d: ReportData, guard=lambda s, item_id=None: s) -> list[Block]:
     p = d.project
     blocks = [Block("title", [Run(f"{p.organisation} media coverage")]),
               Block("meta", [Run(f"{p.organisation} · {_day(d.since)} – {_day(d.last_day)}"
                                  f" · Scope: {scope(p)}")])]
     relevant = [d.items[i] for i, t in d.tags.items() if t.get("relevant") is True and i in d.items]
     if not relevant:
-        blocks.append(Block("para", [Run(f"No coverage of {p.organisation} was found in this period.")]))
+        if d.coverage_note:
+            blocks += [Block("para", [Run(f"No coverage of {p.organisation} was found in the searches "
+                                          f"that finished.")]),
+                       Block("para", [Run("Incomplete collection: ", bold=True), Run(d.coverage_note)])]
+        else:
+            blocks.append(Block("para", [Run(f"No coverage of {p.organisation} was found in this period.")]))
         return blocks
 
     tiers = _tier_of(d.outlets)
@@ -290,7 +296,10 @@ def build(d: ReportData, guard=lambda s: s) -> list[Block]:
     group_counts = [(h, len(members[h])) for h, _ in groups]
 
     blocks.append(Block("h2", [Run("At a glance")]))
-    blocks += _at_a_glance(d, relevant, group_counts, tiers)
+    glance = _at_a_glance(d, relevant, group_counts, tiers)
+    if d.coverage_note:  # right under the headline figure
+        glance.insert(1, Block("bullet", [Run("Incomplete collection: ", bold=True), Run(d.coverage_note)]))
+    blocks += glance
     if d.summary:
         blocks += [Block("h2", [Run("Summary")]), Block("para", [Run(d.summary)])]
 
